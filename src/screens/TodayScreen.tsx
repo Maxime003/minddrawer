@@ -45,7 +45,7 @@ const TodayScreen = () => {
     if (subjects.length === 0) {
       createSubject({
         title: 'Mon premier sujet',
-        context: 'Apprendre React Native',
+        context: 'course',
         rawNotes: 'Ceci est une note de test.',
       });
     }

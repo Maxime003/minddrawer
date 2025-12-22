@@ -22,7 +22,7 @@ const LibraryScreen = () => {
   const handleCreateTestSubject = () => {
     createSubject({
       title: `Sujet de test ${subjects.length + 1}`,
-      context: 'Ceci est un sujet de test créé depuis la bibliothèque',
+      context: 'course',
       rawNotes: 'Notes de test pour vérifier le fonctionnement de la création de sujets.',
     });
   };
