@@ -9,6 +9,7 @@ import TodayScreen from '../screens/TodayScreen';
 import SubjectScreen from '../screens/SubjectScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import CreateSubjectScreen from '../screens/CreateSubjectScreen';
 
 // Types
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
@@ -37,6 +38,14 @@ const RootNavigator = () => {
         />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Subject" component={SubjectScreen} />
+        <Stack.Screen 
+          name="CreateSubject" 
+          component={CreateSubjectScreen}
+          options={{ 
+            title: 'Nouvelle connaissance',
+            presentation: 'modal',
+          }} 
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

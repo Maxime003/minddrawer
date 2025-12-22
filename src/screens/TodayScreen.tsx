@@ -67,10 +67,7 @@ const TodayScreen = () => {
   };
 
   const handleCreateNewSubject = () => {
-    // Pour l'instant, juste un console.log
-    // Plus tard, navigation vers CreateScreen
-    console.log('Créer un nouveau sujet');
-    // navigation.navigate('CreateSubject');
+    navigation.navigate('CreateSubject');
   };
 
   const renderSubjectCard = ({ item }: { item: typeof subjects[0] }) => {

@@ -17,14 +17,10 @@ type LibraryScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 const LibraryScreen = () => {
   const navigation = useNavigation<LibraryScreenNavigationProp>();
-  const { subjects, createSubject, resetForReview } = useSubjectStore();
+  const { subjects, resetForReview } = useSubjectStore();
 
-  const handleCreateTestSubject = () => {
-    createSubject({
-      title: `Sujet de test ${subjects.length + 1}`,
-      context: 'course',
-      rawNotes: 'Notes de test pour vérifier le fonctionnement de la création de sujets.',
-    });
+  const handleCreateNewSubject = () => {
+    navigation.navigate('CreateSubject');
   };
 
   const handleSubjectPress = (subjectId: string) => {
@@ -42,9 +38,9 @@ const LibraryScreen = () => {
         <Text style={styles.title}>Library</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={handleCreateTestSubject}
+          onPress={handleCreateNewSubject}
         >
-          <Text style={styles.addButtonText}>+ Ajouter</Text>
+          <Text style={styles.addButtonText}>+ Nouveau</Text>
         </TouchableOpacity>
       </View>
 
@@ -53,9 +49,9 @@ const LibraryScreen = () => {
           <Text style={styles.emptyText}>Aucun sujet pour le moment</Text>
           <TouchableOpacity
             style={styles.emptyAddButton}
-            onPress={handleCreateTestSubject}
+            onPress={handleCreateNewSubject}
           >
-            <Text style={styles.emptyAddButtonText}>Créer un sujet de test</Text>
+            <Text style={styles.emptyAddButtonText}>Créer un nouveau sujet</Text>
           </TouchableOpacity>
         </View>
       ) : (

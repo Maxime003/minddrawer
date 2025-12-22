@@ -2,6 +2,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   Login: undefined;
   Subject: { id: string };
+  CreateSubject: undefined;
 };
 
 export type MainTabParamList = {

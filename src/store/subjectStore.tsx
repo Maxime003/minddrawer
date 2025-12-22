@@ -3,7 +3,7 @@ import { Subject, CreateSubjectInput, MindMapNode } from '../types/subject';
 
 interface SubjectContextType {
   subjects: Subject[];
-  createSubject: (input: CreateSubjectInput) => void;
+  createSubject: (input: CreateSubjectInput) => string; // Retourne l'ID du sujet créé
   updateNextReview: (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => void;
   resetForReview: (subjectId: string) => void; // Debug: force nextReviewAt à maintenant
 }
@@ -51,8 +51,9 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   };
 
-  const createSubject = (input: CreateSubjectInput) => {
+  const createSubject = (input: CreateSubjectInput): string => {
     const now = new Date();
+    const subjectId = Date.now().toString();
     
     // Utilise forceDate si fourni (pour debug), sinon J+1 par défaut
     const nextReviewAt = input.forceDate 
@@ -67,7 +68,7 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const mindMap = input.mindMap || createMockMindMap(input.title);
 
     const newSubject: Subject = {
-      id: Date.now().toString(),
+      id: subjectId,
       title: input.title,
       context: input.context,
       rawNotes: input.rawNotes,
@@ -79,6 +80,7 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     setSubjects((prev) => [...prev, newSubject]);
+    return subjectId;
   };
 
   const updateNextReview = (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => {
