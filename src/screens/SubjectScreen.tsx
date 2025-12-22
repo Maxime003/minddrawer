@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useSubjectStore } from '../store/subjectStore';
 import { RootStackParamList } from '../types/navigation';
@@ -18,6 +19,7 @@ const SubjectScreen = () => {
   const route = useRoute<SubjectScreenRouteProp>();
   const navigation = useNavigation();
   const { subjects, updateNextReview } = useSubjectStore();
+  const insets = useSafeAreaInsets();
 
   const subjectId = route.params?.id;
   const subject = useMemo(
@@ -61,9 +63,18 @@ const SubjectScreen = () => {
     );
   };
 
+  // Calcul de la hauteur approximative de la zone de révision pour le padding du ScrollView
+  const reviewSectionHeight = 120; // Hauteur approximative de la zone de révision
+
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: reviewSectionHeight + insets.bottom + 20 }
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{subject.title}</Text>
@@ -87,7 +98,7 @@ const SubjectScreen = () => {
       </ScrollView>
 
       {/* Zone Révision */}
-      <View style={styles.reviewContainer}>
+      <View style={[styles.reviewContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <Text style={styles.reviewTitle}>Évaluer la révision</Text>
         <View style={styles.reviewButtons}>
           <TouchableOpacity
@@ -126,7 +137,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 20,
   },
   header: {
     marginBottom: 24,
@@ -183,6 +193,7 @@ const styles = StyleSheet.create({
   reviewContainer: {
     backgroundColor: '#fff',
     padding: 20,
+    paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
     shadowColor: '#000',
