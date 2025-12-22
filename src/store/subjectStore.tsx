@@ -74,9 +74,9 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     } else {
       try {
         // Tentative de génération avec l'IA
-        mindMap = await generateMindMap(input.context, input.rawNotes);
+        mindMap = await generateMindMap(input.title, input.context, input.rawNotes);
       } catch (error) {
-        // En cas d'erreur (API key manquante, erreur réseau, etc.), fallback sur mock
+        // En cas d'erreur (API key manquante, erreur réseau, parsing JSON, etc.), fallback sur mock
         console.warn('Erreur lors de la génération IA, utilisation du mock:', error);
         mindMap = createMockMindMap(input.title);
       }

@@ -7,37 +7,53 @@ const genAI = new GoogleGenerativeAI(
 );
 
 /**
- * Génère une Mind Map à partir d'un contexte et d'un texte
+ * Génère une Mind Map à partir d'un titre, contexte et texte
+ * @param title Le titre du sujet
  * @param context Le contexte du sujet (course, book, article, idea)
  * @param text Le texte brut à analyser
  * @returns Une Mind Map structurée
  */
 export async function generateMindMap(
+  title: string,
   context: string,
   text: string
 ): Promise<MindMapNode> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const prompt = `Tu es un expert en création de Mind Maps pour l'apprentissage.
+    const prompt = `Tu es un expert pédagogique en création de Mind Maps pour l'apprentissage.
 
 Analyse le texte suivant et crée une Mind Map structurée en JSON.
 
+TITRE: ${title}
 CONTEXTE: ${context}
 TEXTE:
 ${text}
 
 INSTRUCTIONS STRICTES:
-1. Crée une Mind Map hiérarchique avec un nœud central (le titre principal du sujet)
+1. Crée une Mind Map hiérarchique avec le titre "${title}" comme nœud central (id: "root", text: "${title}")
 2. Identifie 3 à 5 concepts principaux comme enfants du nœud central
 3. Pour chaque concept principal, ajoute 1 à 3 sous-concepts si pertinent
 4. Chaque nœud doit avoir un "text" court et clair (max 50 caractères)
 5. La structure doit être logique et pédagogique
 
-FORMAT JSON REQUIS:
+SCHEMA JSON ATTENDU (MindMapNode):
+{
+  "id": string,        // Identifiant unique du nœud
+  "text": string,      // Texte du nœud (max 50 caractères)
+  "children": [        // Optionnel : tableau de nœuds enfants
+    {
+      "id": string,
+      "text": string,
+      "children": [...] // Peut être imbriqué
+    }
+  ]
+}
+
+EXEMPLE DE STRUCTURE:
 {
   "id": "root",
-  "text": "Titre principal",
+  "text": "${title}",
   "children": [
     {
       "id": "1",
@@ -56,10 +72,10 @@ FORMAT JSON REQUIS:
   ]
 }
 
-RÈGLE ABSOLUE: Réponds SEULEMENT avec le JSON brut. 
+RÈGLE ABSOLUE: Réponds UNIQUEMENT avec le JSON brut. 
 - PAS de texte avant le JSON
 - PAS de texte après le JSON
-- PAS de markdown
+- PAS de markdown (pas de \`\`\`json)
 - PAS de \`\`\`json ou \`\`\`
 - PAS d'explications
 - UNIQUEMENT le JSON valide, rien d'autre.`;
