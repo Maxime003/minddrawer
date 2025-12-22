@@ -34,7 +34,7 @@ INSTRUCTIONS STRICTES:
 4. Chaque nœud doit avoir un "text" court et clair (max 50 caractères)
 5. La structure doit être logique et pédagogique
 
-FORMAT JSON REQUIS (sans markdown, sans \`\`\`json):
+FORMAT JSON REQUIS:
 {
   "id": "root",
   "text": "Titre principal",
@@ -56,7 +56,13 @@ FORMAT JSON REQUIS (sans markdown, sans \`\`\`json):
   ]
 }
 
-IMPORTANT: Réponds UNIQUEMENT avec le JSON valide. Pas de texte avant, pas de texte après, pas de markdown, pas de \`\`\`json.`;
+RÈGLE ABSOLUE: Réponds SEULEMENT avec le JSON brut. 
+- PAS de texte avant le JSON
+- PAS de texte après le JSON
+- PAS de markdown
+- PAS de \`\`\`json ou \`\`\`
+- PAS d'explications
+- UNIQUEMENT le JSON valide, rien d'autre.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;

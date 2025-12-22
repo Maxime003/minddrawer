@@ -52,7 +52,7 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   };
 
-  const createSubject = (input: CreateSubjectInput): string => {
+  const createSubject = async (input: CreateSubjectInput): Promise<string> => {
     const now = new Date();
     const subjectId = Date.now().toString();
     
@@ -65,8 +65,22 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
           return date;
         })();
 
-    // Génère une mindMap factice si non fournie
-    const mindMap = input.mindMap || createMockMindMap(input.title);
+    // Génère la Mind Map avec l'IA, ou utilise celle fournie, ou fallback sur mock en cas d'erreur
+    let mindMap: MindMapNode;
+    
+    if (input.mindMap) {
+      // Si une mindMap est fournie, on l'utilise
+      mindMap = input.mindMap;
+    } else {
+      try {
+        // Tentative de génération avec l'IA
+        mindMap = await generateMindMap(input.context, input.rawNotes);
+      } catch (error) {
+        // En cas d'erreur (API key manquante, erreur réseau, etc.), fallback sur mock
+        console.warn('Erreur lors de la génération IA, utilisation du mock:', error);
+        mindMap = createMockMindMap(input.title);
+      }
+    }
 
     const newSubject: Subject = {
       id: subjectId,

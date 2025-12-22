@@ -47,6 +47,8 @@ const TodayScreen = () => {
         title: 'Mon premier sujet',
         context: 'course',
         rawNotes: 'Ceci est une note de test.',
+      }).catch((error) => {
+        console.error('Erreur lors de la création du sujet de démo:', error);
       });
     }
   }, [subjects.length, createSubject]);

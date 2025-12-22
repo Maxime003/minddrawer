@@ -35,11 +35,8 @@ const CreateSubjectScreen = () => {
 
     setIsLoading(true);
 
-    // Simulation d'un délai de génération (1 seconde)
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
     try {
-      const subjectId = createSubject({
+      const subjectId = await createSubject({
         title: title.trim(),
         context,
         rawNotes: rawNotes.trim(),
@@ -49,6 +46,7 @@ const CreateSubjectScreen = () => {
       navigation.navigate('Subject', { id: subjectId });
     } catch (error) {
       console.error('Erreur lors de la création du sujet:', error);
+      // TODO: Afficher une alerte à l'utilisateur en cas d'erreur
     } finally {
       setIsLoading(false);
     }
