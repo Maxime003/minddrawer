@@ -23,7 +23,7 @@ export async function generateMindMap(
   console.log('📋 [DEBUG] Paramètres - Titre:', title.substring(0, 30), '| Contexte:', context);
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `Tu es un expert pédagogique en création de Mind Maps pour l'apprentissage.
 
