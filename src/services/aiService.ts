@@ -3,9 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { MindMapNode } from '../types/subject';
 
 // Initialisation de l'API Gemini
-const genAI = new GoogleGenerativeAI(
-  process.env.EXPO_PUBLIC_GEMINI_API_KEY || ''
-);
+const genAI = new GoogleGenerativeAI("AIzaSyAWDgV6d8rSkfpgSLeeIt7EYKvGArT4uG8");
 
 /**
  * Génère une Mind Map à partir d'un titre, contexte et texte
