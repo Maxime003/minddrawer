@@ -1,65 +1,73 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { MindMapNode } from '../types/subject';
 
-// ⚠️ REMPLACE CECI PAR TA VRAIE CLÉ POUR LE TEST :
-const API_KEY = "AIzaSyAWDgV6d8rSkfpgSLeeIt7EYKvGArT4uG8"; 
+// On logue la clé (juste les 5 premiers caractères) pour être sûr qu'elle est chargée
+const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+console.log("🔑 [DEBUG] Clé API chargée :", apiKey ? `${apiKey.substring(0, 5)}...` : "NON (Vide)");
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+const genAI = new GoogleGenerativeAI(apiKey);
 
-export const generateMindMap = async (title: string, context: string, text: string) => {
-  console.log("🚀 [AI DEBUG] Démarrage de la génération pour :", title);
-
+export async function generateMindMap(
+  context: string,
+  text: string
+): Promise<MindMapNode> {
+  console.log("🚀 [DEBUG] Envoi de la requête à Gemini...");
+  
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `
-      Tu es un expert en pédagogie. Crée une Mind Map structurée pour apprendre ce concept.
+      Tu es un expert pédagogique. Crée une structure JSON stricte pour une Mind Map.
       
-      Titre: ${title}
-      Contexte: ${context}
-      Notes brutes: ${text}
+      CONTEXTE: ${context}
+      TEXTE: ${text}
 
-      Format JSON attendu strictement (Respecte cette structure) :
+      RÈGLE D'OR : Réponds UNIQUEMENT avec le JSON. Rien avant, rien après.
+      
+      FORMAT ATTENDU:
       {
         "id": "root",
-        "text": "${title}",
+        "text": "Titre du sujet",
         "children": [
-          { "id": "1", "text": "Sous-concept", "children": [] }
+          { "id": "1", "text": "Concept A", "children": [] }
         ]
       }
-
-      IMPORTANT : Réponds UNIQUEMENT avec le JSON brut. 
-      NE METS PAS de balises markdown comme \`\`\`json ou \`\`\`.
-      Si tu mets du texte avant ou après, le système plantera.
     `;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    let rawText = response.text();
+    const rawText = response.text();
 
-    console.log("📝 [AI DEBUG] Réponse brute reçue de Gemini :", rawText.substring(0, 100) + "...");
+    console.log("📝 [DEBUG] Réponse brute Gemini :", rawText.substring(0, 100) + "...");
 
-    // --- NETTOYAGE DU CODE MARKDOWN (C'est souvent ça qui plante) ---
-    // Enlève les ```json au début et ``` à la fin
-    rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+    // --- NETTOYAGE ROBUSTE ---
+    // On cherche la première accolade '{' et la dernière '}'
+    const jsonStart = rawText.indexOf('{');
+    const jsonEnd = rawText.lastIndexOf('}');
+
+    if (jsonStart === -1 || jsonEnd === -1) {
+      throw new Error("Aucun JSON trouvé dans la réponse");
+    }
+
+    const cleanJson = rawText.substring(jsonStart, jsonEnd + 1);
     
-    // Parse le JSON
-    const jsonResult = JSON.parse(rawText);
-    
-    console.log("✅ [AI DEBUG] JSON parsé avec succès !");
-    return jsonResult;
+    // Parse
+    const mindMapData = JSON.parse(cleanJson) as MindMapNode;
+
+    // Ajout des IDs si manquants (fonction récursive)
+    const addIds = (node: MindMapNode, parentId: string = 'root', index: number = 0): MindMapNode => {
+      const nodeId = node.id || `${parentId}-${index}`;
+      return {
+        id: nodeId,
+        text: node.text,
+        children: node.children?.map((child, i) => addIds(child, nodeId, i)),
+      };
+    };
+
+    return addIds(mindMapData);
 
   } catch (error) {
-    console.error("❌ [AI DEBUG] ERREUR CRITIQUE :", error);
-    
-    // En cas d'erreur, on renvoie une map de secours pour ne pas crasher l'app
-    return {
-      id: "error-root",
-      text: "Erreur IA - Voir Terminal",
-      children: [
-        { id: "e1", text: "Vérifie ta clé API" },
-        { id: "e2", text: "Vérifie ta connexion" },
-        { id: "e3", text: "Regarde les logs" }
-      ]
-    };
+    console.error('❌ [DEBUG] ERREUR EXACTE :', error);
+    throw error; // On relance l'erreur pour que le store bascule sur le mock
   }
-};
+}
