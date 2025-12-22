@@ -21,4 +21,5 @@ export interface CreateSubjectInput {
   context: string;
   rawNotes: string;
   mindMap?: MindMapNode; // Optionnel, sera généré si non fourni
+  forceDate?: Date; // Optionnel, pour debug : force nextReviewAt à cette date
 }

@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,7 +17,7 @@ type LibraryScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 const LibraryScreen = () => {
   const navigation = useNavigation<LibraryScreenNavigationProp>();
-  const { subjects, createSubject } = useSubjectStore();
+  const { subjects, createSubject, resetForReview } = useSubjectStore();
 
   const handleCreateTestSubject = () => {
     createSubject({
@@ -28,6 +29,11 @@ const LibraryScreen = () => {
 
   const handleSubjectPress = (subjectId: string) => {
     navigation.navigate('Subject', { id: subjectId });
+  };
+
+  const handleResetForReview = (subjectId: string) => {
+    resetForReview(subjectId);
+    Alert.alert('Sujet prêt pour révision !', 'Le sujet apparaîtra maintenant dans l\'onglet "Aujourd\'hui".');
   };
 
   return (
@@ -63,7 +69,16 @@ const LibraryScreen = () => {
               onPress={() => handleSubjectPress(item.id)}
               activeOpacity={0.7}
             >
-              <Text style={styles.subjectTitle}>{item.title}</Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.subjectTitle}>{item.title}</Text>
+                <TouchableOpacity
+                  style={styles.testButton}
+                  onPress={() => handleResetForReview(item.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.testButtonText}>♻️ Test</Text>
+                </TouchableOpacity>
+              </View>
               <Text style={styles.subjectDate}>
                 Prochaine révision: {new Date(item.nextReviewAt).toLocaleDateString()}
               </Text>
@@ -118,11 +133,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   subjectTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 6,
+    flex: 1,
+    marginRight: 8,
+  },
+  testButton: {
+    backgroundColor: '#ffd93d',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  testButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
   },
   subjectDate: {
     fontSize: 14,

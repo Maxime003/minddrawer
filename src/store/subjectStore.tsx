@@ -5,6 +5,7 @@ interface SubjectContextType {
   subjects: Subject[];
   createSubject: (input: CreateSubjectInput) => void;
   updateNextReview: (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => void;
+  resetForReview: (subjectId: string) => void; // Debug: force nextReviewAt à maintenant
 }
 
 const SubjectContext = createContext<SubjectContextType | undefined>(undefined);
@@ -52,8 +53,15 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const createSubject = (input: CreateSubjectInput) => {
     const now = new Date();
-    const nextReviewAt = new Date(now);
-    nextReviewAt.setDate(now.getDate() + 1);
+    
+    // Utilise forceDate si fourni (pour debug), sinon J+1 par défaut
+    const nextReviewAt = input.forceDate 
+      ? new Date(input.forceDate)
+      : (() => {
+          const date = new Date(now);
+          date.setDate(now.getDate() + 1);
+          return date;
+        })();
 
     // Génère une mindMap factice si non fournie
     const mindMap = input.mindMap || createMockMindMap(input.title);
@@ -88,8 +96,21 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
+  const resetForReview = (subjectId: string) => {
+    // Debug: force nextReviewAt à maintenant pour simuler qu'un sujet est prêt à être révisé
+    const now = new Date();
+    
+    setSubjects((prev) =>
+      prev.map((subject) =>
+        subject.id === subjectId
+          ? { ...subject, nextReviewAt: now }
+          : subject
+      )
+    );
+  };
+
   return (
-    <SubjectContext.Provider value={{ subjects, createSubject, updateNextReview }}>
+    <SubjectContext.Provider value={{ subjects, createSubject, updateNextReview, resetForReview }}>
       {children}
     </SubjectContext.Provider>
   );
