@@ -1,3 +1,4 @@
+console.log("Ma clé API est :", process.env.EXPO_PUBLIC_GEMINI_API_KEY ? "Chargée ✅" : "Absente ❌");
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { MindMapNode } from '../types/subject';
 
