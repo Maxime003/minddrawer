@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { Subject, CreateSubjectInput, MindMapNode } from '../types/subject';
+import { generateMindMap } from '../services/aiService';
 
 interface SubjectContextType {
   subjects: Subject[];
-  createSubject: (input: CreateSubjectInput) => string; // Retourne l'ID du sujet créé
+  createSubject: (input: CreateSubjectInput) => Promise<string>; // Retourne l'ID du sujet créé
   updateNextReview: (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => void;
   resetForReview: (subjectId: string) => void; // Debug: force nextReviewAt à maintenant
 }
