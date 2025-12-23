@@ -1,90 +1,8 @@
 import { MindMapNode } from '../types/subject';
 
-// Initialisation de l'API avec log de debug pour la clé
+// Initialisation de l'API
 const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
-console.log('🔑 [DEBUG] Clé API chargée :', apiKey ? `${apiKey.substring(0, 5)}...` : 'NON (Vide)');
-
-/**
- * Auto-découverte du modèle Gemini disponible pour ce compte
- * @returns Le nom du modèle disponible (ex: "gemini-1.5-flash" ou "gemini-pro")
- */
-async function getAvailableModel(): Promise<string> {
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-    console.log('🔍 [DEBUG] Recherche des modèles disponibles...');
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ [DEBUG] Erreur lors de la récupération des modèles:', response.status, errorText);
-      throw new Error(`Erreur HTTP ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    const models = data.models || [];
-
-    console.log(`📋 [DEBUG] ${models.length} modèles trouvés`);
-
-    // Modèles favoris à chercher en priorité
-    const favoriteModels = ['gemini-1.5-flash', 'gemini-pro'];
-
-    // 1. Chercher les modèles favoris
-    for (const favorite of favoriteModels) {
-      const found = models.find((model: any) => {
-        const modelName = model.name?.replace('models/', '') || '';
-        return modelName === favorite || modelName.includes(favorite);
-      });
-
-      if (found) {
-        const modelName = found.name?.replace('models/', '') || found.name || favorite;
-        console.log(`✅ [DEBUG] Modèle favori trouvé: ${modelName}`);
-        return modelName;
-      }
-    }
-
-    // 2. Si aucun favori trouvé, prendre le premier modèle Gemini qui supporte generateContent
-    for (const model of models) {
-      const modelName = model.name?.replace('models/', '') || model.name || '';
-      
-      // Vérifier que c'est un modèle Gemini et qu'il supporte generateContent
-      if (
-        modelName.startsWith('gemini') &&
-        (model.supportedGenerationMethods?.includes('generateContent') ||
-          !model.supportedGenerationMethods) // Si pas de restriction, on assume que c'est OK
-      ) {
-        console.log(`✅ [DEBUG] Modèle Gemini trouvé: ${modelName}`);
-        return modelName;
-      }
-    }
-
-    // 3. Fallback : prendre le premier modèle Gemini trouvé
-    const firstGemini = models.find((model: any) => {
-      const modelName = model.name?.replace('models/', '') || model.name || '';
-      return modelName.startsWith('gemini');
-    });
-
-    if (firstGemini) {
-      const modelName = firstGemini.name?.replace('models/', '') || firstGemini.name || 'gemini-pro';
-      console.log(`⚠️ [DEBUG] Utilisation du premier modèle Gemini trouvé: ${modelName}`);
-      return modelName;
-    }
-
-    // 4. Dernier recours : retourner un modèle par défaut
-    console.warn('⚠️ [DEBUG] Aucun modèle Gemini trouvé, utilisation du fallback: gemini-pro');
-    return 'gemini-pro';
-  } catch (error) {
-    console.error('❌ [DEBUG] Erreur lors de la découverte des modèles:', error);
-    // En cas d'erreur, retourner un modèle par défaut
-    console.warn('⚠️ [DEBUG] Utilisation du modèle par défaut: gemini-pro');
-    return 'gemini-pro';
-  }
-}
+const MODEL_NAME = 'gemini-2.5-flash';
 
 /**
  * Génère une Mind Map à partir d'un titre, contexte et texte
@@ -98,13 +16,7 @@ export async function generateMindMap(
   context: string,
   text: string
 ): Promise<MindMapNode> {
-  console.log('🚀 [DEBUG] Envoi de la requête à Gemini...');
-  console.log('📋 [DEBUG] Paramètres - Titre:', title.substring(0, 30), '| Contexte:', context);
-
   try {
-    // Auto-découverte du modèle disponible
-    const modelName = await getAvailableModel();
-    console.log(`✅ [DEBUG] Modèle choisi : ${modelName}`);
 
     const prompt = `Tu es un expert pédagogique en création de Mind Maps pour l'apprentissage.
 
@@ -152,8 +64,8 @@ RÈGLE ABSOLUE: Réponds UNIQUEMENT avec le JSON brut.
 - PAS d'explications
 - UNIQUEMENT le JSON valide, rien d'autre.`;
 
-    // Construction de l'URL REST API avec le modèle découvert
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    // Construction de l'URL REST API
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
 
     // Structure du body selon la spec REST de Gemini
     const requestBody = {
@@ -168,7 +80,6 @@ RÈGLE ABSOLUE: Réponds UNIQUEMENT avec le JSON brut.
       ],
     };
 
-    console.log('🌐 [DEBUG] Envoi de la requête HTTP à Gemini...');
 
     // Requête HTTP avec fetch
     const response = await fetch(url, {
@@ -196,8 +107,6 @@ RÈGLE ABSOLUE: Réponds UNIQUEMENT avec le JSON brut.
         throw new Error('Format de réponse inattendu de Gemini API');
       })();
 
-    console.log('📝 [DEBUG] Réponse brute Gemini (premiers 200 caractères):', rawText.substring(0, 200));
-    console.log('📏 [DEBUG] Longueur totale de la réponse:', rawText.length);
 
     // --- PARSING JSON ROBUSTE ---
     // Extraction du bloc JSON en cherchant la première '{' et la dernière '}'
@@ -205,20 +114,16 @@ RÈGLE ABSOLUE: Réponds UNIQUEMENT avec le JSON brut.
     const jsonEnd = rawText.lastIndexOf('}');
 
     if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
-      console.error('❌ [DEBUG] JSON invalide - jsonStart:', jsonStart, 'jsonEnd:', jsonEnd);
       throw new Error('Aucun JSON valide trouvé dans la réponse de Gemini');
     }
 
     const jsonString = rawText.substring(jsonStart, jsonEnd + 1);
-    console.log('✅ [DEBUG] JSON extrait (premiers 150 caractères):', jsonString.substring(0, 150));
 
     // Parse du JSON
     let mindMapData: MindMapNode;
     try {
       mindMapData = JSON.parse(jsonString) as MindMapNode;
-      console.log('✅ [DEBUG] JSON parsé avec succès');
     } catch (parseError) {
-      console.error('❌ [DEBUG] Erreur de parsing JSON:', parseError);
       throw new Error(`Erreur de parsing JSON: ${parseError instanceof Error ? parseError.message : 'Erreur inconnue'}`);
     }
 
@@ -233,15 +138,10 @@ RÈGLE ABSOLUE: Réponds UNIQUEMENT avec le JSON brut.
     };
 
     const mindMapWithIds = addIds(mindMapData);
-    console.log('✅ [DEBUG] Mind Map générée avec succès');
     return mindMapWithIds;
 
   } catch (error) {
-    console.error('❌ [DEBUG] ERREUR EXACTE dans generateMindMap:', error);
-    if (error instanceof Error) {
-      console.error('❌ [DEBUG] Message d\'erreur:', error.message);
-      console.error('❌ [DEBUG] Stack trace:', error.stack);
-    }
+    console.error('❌ Erreur lors de la génération de la Mind Map:', error);
     throw error; // On relance l'erreur pour que le store bascule sur le mock
   }
 }

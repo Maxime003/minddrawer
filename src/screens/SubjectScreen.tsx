@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useSubjectStore } from '../store/subjectStore';
 import { RootStackParamList } from '../types/navigation';
-import { MindMapNode } from '../types/subject';
+import MindMapNodeView from '../components/MindMapNodeView';
 
 type SubjectScreenRouteProp = RouteProp<RootStackParamList, 'Subject'>;
 
@@ -45,24 +45,6 @@ const SubjectScreen = () => {
     ]);
   };
 
-  const getMindMapLevelColor = (level: number): string => {
-    const colors = ['#4a90e2', '#7b68ee', '#9370db', '#ba55d3', '#da70d6'];
-    return colors[Math.min(level, colors.length - 1)];
-  };
-
-  const renderMindMapNode = (node: MindMapNode, level: number = 0) => {
-    const indent = level * 20;
-    const backgroundColor = getMindMapLevelColor(level);
-    return (
-      <View key={node.id} style={[styles.mindMapNode, { marginLeft: indent }]}>
-        <View style={[styles.mindMapNodeContent, { backgroundColor }]}>
-          <Text style={styles.mindMapNodeText}>{node.text}</Text>
-        </View>
-        {node.children?.map((child) => renderMindMapNode(child, level + 1))}
-      </View>
-    );
-  };
-
   // Calcul de la hauteur approximative de la zone de révision pour le padding du ScrollView
   const reviewSectionHeight = 120; // Hauteur approximative de la zone de révision
 
@@ -84,7 +66,13 @@ const SubjectScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Mind Map</Text>
           <View style={styles.mindMapContainer}>
-            {renderMindMapNode(subject.mindMap)}
+            {subject.mindMap && subject.mindMap.text ? (
+              <MindMapNodeView node={subject.mindMap} level={0} />
+            ) : (
+              <View style={styles.emptyMindMapContainer}>
+                <Text style={styles.emptyMindMapText}>Génération en cours...</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -165,18 +153,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  mindMapNode: {
-    marginBottom: 8,
+  emptyMindMapContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  mindMapNodeContent: {
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 4,
-  },
-  mindMapNodeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+  emptyMindMapText: {
+    fontSize: 16,
+    color: '#999',
+    fontStyle: 'italic',
   },
   notesContainer: {
     backgroundColor: '#f9f9f9',
