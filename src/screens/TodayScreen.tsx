@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -39,19 +39,7 @@ const getDaysOverdue = (reviewDate: Date): number => {
 
 const TodayScreen = () => {
   const navigation = useNavigation<TodayScreenNavigationProp>();
-  const { subjects, createSubject } = useSubjectStore();
-
-  useEffect(() => {
-    if (subjects.length === 0) {
-      createSubject({
-        title: 'Mon premier sujet',
-        context: 'course',
-        rawNotes: 'Ceci est une note de test.',
-      }).catch((error) => {
-        console.error('Erreur lors de la création du sujet de démo:', error);
-      });
-    }
-  }, [subjects.length, createSubject]);
+  const { subjects } = useSubjectStore();
 
   const subjectsDueToday = useMemo(() => {
     const today = new Date();

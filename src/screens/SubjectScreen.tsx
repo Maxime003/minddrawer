@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,18 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp, NativeStackNavigationProp } from '@react-navigation/native';
 import { useSubjectStore } from '../store/subjectStore';
 import { RootStackParamList } from '../types/navigation';
 import MindMapNodeView from '../components/MindMapNodeView';
 
 type SubjectScreenRouteProp = RouteProp<RootStackParamList, 'Subject'>;
+type SubjectScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SubjectScreen = () => {
   const route = useRoute<SubjectScreenRouteProp>();
-  const navigation = useNavigation();
-  const { subjects, updateNextReview } = useSubjectStore();
+  const navigation = useNavigation<SubjectScreenNavigationProp>();
+  const { subjects, updateNextReview, deleteSubject } = useSubjectStore();
   const insets = useSafeAreaInsets();
 
   const subjectId = route.params?.id;
@@ -26,6 +27,45 @@ const SubjectScreen = () => {
     () => subjects.find((s) => s.id === subjectId),
     [subjects, subjectId]
   );
+
+  // Configuration du header avec bouton de suppression
+  useLayoutEffect(() => {
+    if (!subject) return;
+
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => {
+            Alert.alert(
+              'Supprimer ce sujet ?',
+              'Cette action est irréversible.',
+              [
+                {
+                  text: 'Annuler',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Supprimer',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await deleteSubject(subject.id);
+                      navigation.goBack();
+                    } catch (error) {
+                      Alert.alert('Erreur', 'Impossible de supprimer le sujet.');
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+          style={styles.deleteButton}
+        >
+          <Text style={styles.deleteButtonText}>🗑️</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, subject, deleteSubject]);
 
   if (!subject) {
     return (
@@ -225,6 +265,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#ff6b6b',
     textAlign: 'center',
+  },
+  deleteButton: {
+    marginRight: 16,
+    padding: 8,
+  },
+  deleteButtonText: {
+    fontSize: 20,
   },
 });
 

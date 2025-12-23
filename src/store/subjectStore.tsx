@@ -9,6 +9,7 @@ interface SubjectContextType {
   subjects: Subject[];
   createSubject: (input: CreateSubjectInput) => Promise<string>; // On passe en Promise !
   updateNextReview: (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => void;
+  deleteSubject: (id: string) => Promise<void>;
 }
 
 const SubjectContext = createContext<SubjectContextType | undefined>(undefined);
@@ -83,7 +84,7 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
 
     const now = new Date();
-    const nextReviewAt = getNextDay();
+    const nextReviewAt = new Date();
 
     // 2. Insertion en base de données (mapping camelCase -> snake_case)
     const { data, error } = await supabase
@@ -186,8 +187,24 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
+  const deleteSubject = async (subjectId: string): Promise<void> => {
+    // Suppression en base de données
+    const { error } = await supabase
+      .from('subjects')
+      .delete()
+      .eq('id', subjectId);
+
+    if (error) {
+      console.error('Erreur lors de la suppression du sujet:', error);
+      throw error;
+    }
+
+    // Mise à jour de l'état local en filtrant l'ID supprimé
+    setSubjects((prev) => prev.filter((subject) => subject.id !== subjectId));
+  };
+
   return (
-    <SubjectContext.Provider value={{ subjects, createSubject, updateNextReview }}>
+    <SubjectContext.Provider value={{ subjects, createSubject, updateNextReview, deleteSubject }}>
       {children}
     </SubjectContext.Provider>
   );
