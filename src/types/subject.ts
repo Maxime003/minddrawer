@@ -21,6 +21,7 @@ export interface Subject {
   mindMap: MindMapNode;
   difficultyFactor: number; // EF (Ease Factor) pour SuperMemo, entre 1.3 et 2.5
   reviewCount: number;
+  lastInterval: number; // Dernier intervalle en jours (pour SM-2)
   createdAt: Date;
   nextReviewAt: Date;
 }
