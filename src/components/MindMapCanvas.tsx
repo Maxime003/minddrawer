@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-// 👇 IMPORTANT : Toujours garder les accolades ici
+// 👇 Toujours l'import nommé avec les accolades
 import { ReactNativeZoomableView } from '@dudigital/react-native-zoomable-view';
 import Svg, { Path } from 'react-native-svg';
 import { MindMapNode } from '../types/subject';
@@ -12,28 +12,24 @@ interface MindMapCanvasProps {
   onNodePress?: (node: ComputedNode) => void;
 }
 
-// 1. On réduit la taille pour soulager la mémoire (2000px suffisent largement)
 const CANVAS_SIZE = 2000;
 const CANVAS_CENTER = CANVAS_SIZE / 2;
 
-// Récupération des dimensions de l'écran
+// On récupère les dimensions de l'écran pour calculer le centre
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) => {
-  const zoomRef = useRef<ReactNativeZoomableView | null>(null);
-  
-  // Recalcul du layout si les données changent
+  // Calcul du layout
   const { nodes, edges } = useMemo(() => calculateRadialLayout(rootNode), [rootNode]);
 
-  // 2. Calcul du décalage initial précis
-  // Pour centrer le point (1000, 1000) sur un écran (ex: 400, 800)
-  // On doit décaler le canvas vers la gauche et le haut.
+  // --- CALCUL DU CENTRAGE (Correction) ---
+  // On veut que le pixel 1000 (Centre Canvas) soit au milieu de l'écran.
+  // Décalage = (Moitié Ecran) - (Centre Canvas)
+  // Ex: 200 - 1000 = -800.
   const initialOffsetX = (screenWidth / 2) - CANVAS_CENTER;
   const initialOffsetY = (screenHeight / 2) - CANVAS_CENTER;
 
-  // Création des courbes
   const createEdgePath = (edge: ComputedEdge): string => {
-    // Conversion coordonnées relatives -> absolues dans le canvas
     const sx = edge.source.x + CANVAS_CENTER;
     const sy = edge.source.y + CANVAS_CENTER;
     const tx = edge.target.x + CANVAS_CENTER;
@@ -51,50 +47,42 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
     if (onNodePress) onNodePress(node);
   };
 
-  // 3. Sécurité : On force le zoom à se positionner après le montage du composant
-  useEffect(() => {
-    if (zoomRef.current) {
-        // Optionnel : si le centrage initial rate, on peut le forcer ici
-        // zoomRef.current.moveTo(initialOffsetX, initialOffsetY);
-    }
-  }, []);
-
   return (
     <View style={styles.container}>
       <ReactNativeZoomableView
-        ref={zoomRef}
         maxZoom={2}
         minZoom={0.2}
         zoomStep={0.5}
-        initialZoom={1} // Zoom normal au début
-        bindToBorders={false} // Permet de sortir du cadre (essentiel)
+        initialZoom={1}
+        bindToBorders={false} // Important : permet de se balader librement
         panEnabled={true}
         zoomEnabled={true}
-        // Définition explicite de la taille du contenu
-        contentWidth={CANVAS_SIZE}
-        contentHeight={CANVAS_SIZE}
-        // Application du décalage calculé
+        // 👇 C'EST ICI QUE C'ETAIT MANQUANT : On passe les offsets calculés
         initialOffsetX={initialOffsetX}
         initialOffsetY={initialOffsetY}
+        // 👇 On retire contentWidth/Height pour éviter de bloquer le Pan
         style={styles.zoomableView}
       >
         <View style={styles.canvasContainer}>
           
-          {/* Couche 1 : Les Liens (SVG) */}
-          <Svg width={CANVAS_SIZE} height={CANVAS_SIZE} style={styles.svgLayer}>
-            {edges.map((edge) => (
-              <Path
-                key={edge.id}
-                d={createEdgePath(edge)}
-                fill="none"
-                stroke={theme.colors.surfaceHighlight}
-                strokeWidth={2}
-                opacity={0.6}
-              />
-            ))}
-          </Svg>
+          {/* Couche SVG (Lignes) */}
+          {/* pointerEvents="none" laisse passer le clic au travers vers le fond pour le Pan */}
+          <View style={styles.svgLayerWrapper} pointerEvents="none">
+            <Svg width={CANVAS_SIZE} height={CANVAS_SIZE}>
+                {edges.map((edge) => (
+                <Path
+                    key={edge.id}
+                    d={createEdgePath(edge)}
+                    fill="none"
+                    stroke={theme.colors.surfaceHighlight}
+                    strokeWidth={2}
+                    opacity={0.6}
+                />
+                ))}
+            </Svg>
+          </View>
 
-          {/* Couche 2 : Les Nœuds */}
+          {/* Couche Nœuds (Cartes) */}
           {nodes.map((node) => {
             const isRoot = node.level === 0;
             const nodeX = node.x + CANVAS_CENTER;
@@ -137,25 +125,28 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   zoomableView: {
-    flex: 1, // Prend toute la place dispo
+    flex: 1,
   },
   canvasContainer: {
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
-    // Fond transparent mais "solide" pour capturer le tactile
+    // Une couleur de fond quasi-invisible est nécessaire pour capter le "drag" (Pan)
     backgroundColor: 'rgba(255,255,255, 0.001)', 
   },
-  svgLayer: {
+  svgLayerWrapper: {
     position: 'absolute',
     top: 0,
     left: 0,
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    zIndex: 0,
   },
   nodeContainer: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
     width: 200, 
-    height: 60, // Hauteur fixe pour aider le layout
+    height: 60,
     zIndex: 10,
   },
   nodeCard: {
