@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import ReactNativeZoomableView from '@dudigital/react-native-zoomable-view';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+// 👇 IMPORTANT : Toujours garder les accolades ici
+import { ReactNativeZoomableView } from '@dudigital/react-native-zoomable-view';
 import Svg, { Path } from 'react-native-svg';
 import { MindMapNode } from '../types/subject';
 import { calculateRadialLayout, ComputedNode, ComputedEdge } from '../utils/layoutEngine';
@@ -11,83 +12,76 @@ interface MindMapCanvasProps {
   onNodePress?: (node: ComputedNode) => void;
 }
 
-const CANVAS_SIZE = 5000; // Taille du canvas SVG
+// 1. On réduit la taille pour soulager la mémoire (2000px suffisent largement)
+const CANVAS_SIZE = 2000;
 const CANVAS_CENTER = CANVAS_SIZE / 2;
 
-/**
- * Composant pour afficher une Mind Map en mode radial/nuage avec zoom et pan
- */
+// Récupération des dimensions de l'écran
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
 const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) => {
-  // Calcule les positions des nœuds et arêtes
-  const { nodes, edges } = useMemo(() => {
-    return calculateRadialLayout(rootNode);
-  }, [rootNode]);
+  const zoomRef = useRef<ReactNativeZoomableView | null>(null);
+  
+  // Recalcul du layout si les données changent
+  const { nodes, edges } = useMemo(() => calculateRadialLayout(rootNode), [rootNode]);
 
-  // Trouve les limites pour centrer le canvas
-  const bounds = useMemo(() => {
-    if (nodes.length === 0) {
-      return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-    }
-    
-    const xs = nodes.map(n => n.x);
-    const ys = nodes.map(n => n.y);
-    
-    return {
-      minX: Math.min(...xs),
-      maxX: Math.max(...xs),
-      minY: Math.min(...ys),
-      maxY: Math.max(...ys),
-    };
-  }, [nodes]);
+  // 2. Calcul du décalage initial précis
+  // Pour centrer le point (1000, 1000) sur un écran (ex: 400, 800)
+  // On doit décaler le canvas vers la gauche et le haut.
+  const initialOffsetX = (screenWidth / 2) - CANVAS_CENTER;
+  const initialOffsetY = (screenHeight / 2) - CANVAS_CENTER;
 
-  // Offset pour centrer le canvas
-  const offsetX = CANVAS_CENTER - (bounds.minX + bounds.maxX) / 2;
-  const offsetY = CANVAS_CENTER - (bounds.minY + bounds.maxY) / 2;
-
-  /**
-   * Crée un chemin SVG pour une arête (courbe de Bézier)
-   */
+  // Création des courbes
   const createEdgePath = (edge: ComputedEdge): string => {
-    const sx = edge.source.x + offsetX;
-    const sy = edge.source.y + offsetY;
-    const tx = edge.target.x + offsetX;
-    const ty = edge.target.y + offsetY;
+    // Conversion coordonnées relatives -> absolues dans le canvas
+    const sx = edge.source.x + CANVAS_CENTER;
+    const sy = edge.source.y + CANVAS_CENTER;
+    const tx = edge.target.x + CANVAS_CENTER;
+    const ty = edge.target.y + CANVAS_CENTER;
 
-    // Courbe de Bézier quadratique pour un effet plus organique
     const midX = (sx + tx) / 2;
     const midY = (sy + ty) / 2;
-    
-    // Point de contrôle pour la courbe (légèrement décalé pour une courbe douce)
     const dx = tx - sx;
     const dy = ty - sy;
-    const controlX = midX - dy * 0.3;
-    const controlY = midY + dx * 0.3;
-
-    return `M ${sx} ${sy} Q ${controlX} ${controlY} ${tx} ${ty}`;
+    
+    return `M ${sx} ${sy} Q ${midX - dy * 0.3} ${midY + dx * 0.3} ${tx} ${ty}`;
   };
 
   const handleNodePress = (node: ComputedNode) => {
-    if (onNodePress) {
-      onNodePress(node);
-    }
+    if (onNodePress) onNodePress(node);
   };
+
+  // 3. Sécurité : On force le zoom à se positionner après le montage du composant
+  useEffect(() => {
+    if (zoomRef.current) {
+        // Optionnel : si le centrage initial rate, on peut le forcer ici
+        // zoomRef.current.moveTo(initialOffsetX, initialOffsetY);
+    }
+  }, []);
 
   return (
     <View style={styles.container}>
       <ReactNativeZoomableView
+        ref={zoomRef}
         maxZoom={2}
         minZoom={0.2}
-        initialZoom={0.8}
-        bindToBorders={false}
-        style={styles.zoomContainer}
+        zoomStep={0.5}
+        initialZoom={1} // Zoom normal au début
+        bindToBorders={false} // Permet de sortir du cadre (essentiel)
+        panEnabled={true}
+        zoomEnabled={true}
+        // Définition explicite de la taille du contenu
+        contentWidth={CANVAS_SIZE}
+        contentHeight={CANVAS_SIZE}
+        // Application du décalage calculé
+        initialOffsetX={initialOffsetX}
+        initialOffsetY={initialOffsetY}
+        style={styles.zoomableView}
       >
         <View style={styles.canvasContainer}>
+          
           {/* Couche 1 : Les Liens (SVG) */}
-          <Svg
-            width={CANVAS_SIZE}
-            height={CANVAS_SIZE}
-            style={styles.svgLayer}
-          >
+          <Svg width={CANVAS_SIZE} height={CANVAS_SIZE} style={styles.svgLayer}>
             {edges.map((edge) => (
               <Path
                 key={edge.id}
@@ -100,11 +94,11 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
             ))}
           </Svg>
 
-          {/* Couche 2 : Les Nœuds (Views) */}
+          {/* Couche 2 : Les Nœuds */}
           {nodes.map((node) => {
             const isRoot = node.level === 0;
-            const nodeX = node.x + offsetX;
-            const nodeY = node.y + offsetY;
+            const nodeX = node.x + CANVAS_CENTER;
+            const nodeY = node.y + CANVAS_CENTER;
 
             return (
               <TouchableOpacity
@@ -112,8 +106,8 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
                 style={[
                   styles.nodeContainer,
                   {
-                    left: nodeX - 100, // Ajuste pour centrer (moitié de la largeur max estimée)
-                    top: nodeY - 30, // Ajuste pour centrer (moitié de la hauteur estimée)
+                    left: nodeX - 100, // Centrage horizontal (largeur 200)
+                    top: nodeY - 30,  // Centrage vertical
                   },
                   isRoot ? styles.rootNode : styles.childNode,
                 ]}
@@ -121,15 +115,11 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
                 activeOpacity={0.7}
               >
                 <View style={[styles.nodeCard, isRoot ? styles.rootCard : styles.childCard]}>
-                  <Text
-                    style={[
-                      styles.nodeText,
-                      isRoot ? styles.rootText : styles.childText,
-                    ]}
-                    numberOfLines={3}
-                  >
+                  <Text style={[styles.nodeText, isRoot ? styles.rootText : styles.childText]} numberOfLines={3}>
                     {node.text}
                   </Text>
+                  
+                  {!isRoot && <View style={styles.connectionDot} />}
                 </View>
               </TouchableOpacity>
             );
@@ -144,14 +134,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    overflow: 'hidden',
   },
-  zoomContainer: {
-    flex: 1,
+  zoomableView: {
+    flex: 1, // Prend toute la place dispo
   },
   canvasContainer: {
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
-    position: 'relative',
+    // Fond transparent mais "solide" pour capturer le tactile
+    backgroundColor: 'rgba(255,255,255, 0.001)', 
   },
   svgLayer: {
     position: 'absolute',
@@ -162,13 +154,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
+    width: 200, 
+    height: 60, // Hauteur fixe pour aider le layout
+    zIndex: 10,
   },
   nodeCard: {
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
     borderRadius: theme.borderRadius.m,
     minWidth: 100,
-    maxWidth: 200,
+    maxWidth: 180,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -181,13 +176,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+    paddingVertical: theme.spacing.m,
+    minWidth: 140,
   },
   childCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: 'rgba(30, 34, 43, 0.95)',
     borderWidth: 1,
     borderColor: theme.colors.surfaceHighlight,
-    // Effet glassmorphism avec fond semi-transparent
-    backgroundColor: 'rgba(30, 34, 43, 0.8)', // surface avec opacité
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   nodeText: {
     color: theme.colors.textPrimary,
@@ -198,14 +197,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   childText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
   },
-  rootNode: {
-    // Ajustements pour le nœud racine
-  },
-  childNode: {
-    // Ajustements pour les nœuds enfants
+  rootNode: { zIndex: 100 },
+  childNode: { zIndex: 50 },
+  connectionDot: {
+    position: 'absolute',
+    left: -5,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.accent,
+    borderWidth: 2,
+    borderColor: theme.colors.surface,
   },
 });
 
