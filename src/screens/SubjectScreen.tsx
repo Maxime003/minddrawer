@@ -1,9 +1,8 @@
-import React, { useMemo, useLayoutEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
@@ -11,7 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, NativeStackNavigationProp } from '@react-navigation/native';
 import { useSubjectStore } from '../store/subjectStore';
 import { RootStackParamList } from '../types/navigation';
-import MindMapNodeView from '../components/MindMapNodeView';
+import MindMapCanvas from '../components/MindMapCanvas';
+import { theme } from '../theme/theme';
 
 type SubjectScreenRouteProp = RouteProp<RootStackParamList, 'Subject'>;
 type SubjectScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -28,45 +28,6 @@ const SubjectScreen = () => {
     [subjects, subjectId]
   );
 
-  // Configuration du header avec bouton de suppression
-  useLayoutEffect(() => {
-    if (!subject) return;
-
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={() => {
-            Alert.alert(
-              'Supprimer ce sujet ?',
-              'Cette action est irréversible.',
-              [
-                {
-                  text: 'Annuler',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Supprimer',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await deleteSubject(subject.id);
-                      navigation.goBack();
-                    } catch (error) {
-                      Alert.alert('Erreur', 'Impossible de supprimer le sujet.');
-                    }
-                  },
-                },
-              ]
-            );
-          }}
-          style={styles.deleteButton}
-        >
-          <Text style={styles.deleteButtonText}>🗑️</Text>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, subject, deleteSubject]);
-
   if (!subject) {
     return (
       <View style={styles.container}>
@@ -74,6 +35,31 @@ const SubjectScreen = () => {
       </View>
     );
   }
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Supprimer ce sujet ?',
+      'Cette action est irréversible.',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteSubject(subject.id);
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de supprimer le sujet.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleReview = (difficulty: 'easy' | 'medium' | 'hard') => {
     updateNextReview(subject.id, difficulty);
@@ -85,45 +71,26 @@ const SubjectScreen = () => {
     ]);
   };
 
-  // Calcul de la hauteur approximative de la zone de révision pour le padding du ScrollView
-  const reviewSectionHeight = 120; // Hauteur approximative de la zone de révision
-
   return (
     <View style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView} 
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: reviewSectionHeight + insets.bottom + 20 }
-        ]}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{subject.title}</Text>
-        </View>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <Text style={styles.headerTitle}>{subject.title}</Text>
+        <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
+          <Text style={styles.deleteButtonText}>🗑️</Text>
+        </TouchableOpacity>
+      </View>
 
-        {/* Zone Mind Map */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mind Map</Text>
-          <View style={styles.mindMapContainer}>
-            {subject.mindMap && subject.mindMap.text ? (
-              <MindMapNodeView node={subject.mindMap} level={0} />
-            ) : (
-              <View style={styles.emptyMindMapContainer}>
-                <Text style={styles.emptyMindMapText}>Génération en cours...</Text>
-              </View>
-            )}
+      {/* Zone Mind Map - Plein écran */}
+      <View style={styles.mindMapContainer}>
+        {subject.mindMap && subject.mindMap.text ? (
+          <MindMapCanvas rootNode={subject.mindMap} />
+        ) : (
+          <View style={styles.emptyMindMapContainer}>
+            <Text style={styles.emptyMindMapText}>Génération en cours...</Text>
           </View>
-        </View>
-
-        {/* Zone Notes */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notes</Text>
-          <View style={styles.notesContainer}>
-            <Text style={styles.notesText}>{subject.rawNotes}</Text>
-          </View>
-        </View>
-      </ScrollView>
+        )}
+      </View>
 
       {/* Zone Révision */}
       <View style={[styles.reviewContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
@@ -158,120 +125,94 @@ const SubjectScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
+    backgroundColor: theme.colors.background,
   },
   header: {
-    marginBottom: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: theme.spacing.l,
+    paddingBottom: theme.spacing.m,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    zIndex: 10,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#555',
-    marginBottom: 12,
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    flex: 1,
   },
   mindMapContainer: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    flex: 1, // Prend tout l'espace disponible
   },
   emptyMindMapContainer: {
-    padding: 20,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.colors.background,
   },
   emptyMindMapText: {
     fontSize: 16,
-    color: '#999',
+    color: theme.colors.textSecondary,
     fontStyle: 'italic',
   },
-  notesContainer: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  notesText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
-  },
   reviewContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    paddingTop: 20,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.m,
+    paddingTop: theme.spacing.m,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: theme.colors.surfaceHighlight,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 5,
   },
   reviewTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.s,
     textAlign: 'center',
   },
   reviewButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: theme.spacing.s,
   },
   reviewButton: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: theme.spacing.m,
+    paddingHorizontal: theme.spacing.m,
+    borderRadius: theme.borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reviewButtonEasy: {
-    backgroundColor: '#6bcf7f',
+    backgroundColor: theme.colors.success,
   },
   reviewButtonMedium: {
-    backgroundColor: '#ffd93d',
+    backgroundColor: theme.colors.warning,
   },
   reviewButtonHard: {
-    backgroundColor: '#ff6b6b',
+    backgroundColor: theme.colors.error,
   },
   reviewButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: theme.colors.textPrimary,
+    fontSize: 14,
     fontWeight: '600',
   },
   errorText: {
     fontSize: 18,
-    color: '#ff6b6b',
+    color: theme.colors.error,
     textAlign: 'center',
   },
   deleteButton: {
-    marginRight: 16,
-    padding: 8,
+    padding: theme.spacing.s,
   },
   deleteButtonText: {
     fontSize: 20,
+    color: theme.colors.textPrimary,
   },
 });
 

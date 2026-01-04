@@ -6,11 +6,15 @@ import {
   FlatList,
   TouchableOpacity,
   SafeAreaView,
+  StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSubjectStore } from '../store/subjectStore';
 import { RootStackParamList } from '../types/navigation';
+import { theme } from '../theme/theme';
 
 type TodayScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -60,41 +64,86 @@ const TodayScreen = () => {
     navigation.navigate('CreateSubject');
   };
 
+  const handleReviewPress = (subjectId: string, event: any) => {
+    event.stopPropagation();
+    navigation.navigate('Subject', { id: subjectId });
+  };
+
   const renderSubjectCard = ({ item }: { item: typeof subjects[0] }) => {
     const reviewDate = new Date(item.nextReviewAt);
     const daysOverdue = getDaysOverdue(reviewDate);
     const isToday = daysOverdue === 0;
+    const borderColor = isToday ? theme.colors.success : theme.colors.error;
+    const badgeColor = isToday ? theme.colors.success : theme.colors.primary;
     
     return (
       <TouchableOpacity
-        style={styles.subjectCard}
+        style={[styles.subjectCard, { borderLeftColor: borderColor }]}
         onPress={() => handleSubjectPress(item.id)}
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.subjectTitle}>{item.title}</Text>
-          <View style={[styles.badge, isToday ? styles.badgeToday : styles.badgeOverdue]}>
-            <Text style={styles.badgeText}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.subjectTitle}>{item.title}</Text>
+          </View>
+          <View style={[styles.badge, { backgroundColor: badgeColor + '20' }]}>
+            <Text style={[styles.badgeText, { color: badgeColor }]}>
               {isToday ? 'À réviser' : `${daysOverdue}j de retard`}
             </Text>
           </View>
         </View>
-        <Text style={styles.subjectDate}>
-          {reviewDate.toLocaleDateString('fr-FR', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </Text>
+        
+        <View style={styles.separator} />
+        
+        <View style={styles.cardContent}>
+          <View style={styles.metadataRow}>
+            <Ionicons name="calendar-outline" size={14} color={theme.colors.textSecondary} />
+            <Text style={[styles.metadataText, { marginLeft: theme.spacing.xs }]}>
+              {reviewDate.toLocaleDateString('fr-FR', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })}
+            </Text>
+          </View>
+          <View style={styles.metadataRow}>
+            <Ionicons name="time-outline" size={14} color={theme.colors.textSecondary} />
+            <Text style={[styles.metadataText, { marginLeft: theme.spacing.xs }]}>~15 min</Text>
+          </View>
+        </View>
+        
+        <TouchableOpacity
+          style={styles.reviewButton}
+          onPress={(e) => handleReviewPress(item.id, e)}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[theme.colors.primary, theme.colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.reviewButtonGradient}
+          >
+            <Ionicons name="play" size={18} color={theme.colors.textPrimary} />
+            <Text style={[styles.reviewButtonText, { marginLeft: theme.spacing.xs }]}>Réviser</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
+  const todayDate = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <Text style={styles.title}>Aujourd'hui</Text>
+        <Text style={styles.date}>{todayDate}</Text>
       </View>
 
       {subjectsDueToday.length === 0 ? (
@@ -114,11 +163,18 @@ const TodayScreen = () => {
 
       {/* Bouton FAB pour créer un nouveau sujet */}
       <TouchableOpacity
-        style={styles.fab}
         onPress={handleCreateNewSubject}
         activeOpacity={0.8}
+        style={styles.fabContainer}
       >
-        <Text style={styles.fabText}>+</Text>
+        <LinearGradient
+          colors={[theme.colors.primary, theme.colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fab}
+        >
+          <Text style={styles.fabText}>+</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -127,112 +183,141 @@ const TodayScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: theme.spacing.l,
+    paddingTop: theme.spacing.l,
+    paddingBottom: theme.spacing.m,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 32,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.xs,
+  },
+  date: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textTransform: 'capitalize',
   },
   listContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: theme.spacing.l,
+    paddingTop: theme.spacing.m,
     paddingBottom: 100, // Espace pour le FAB
   },
   subjectCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.m,
+    borderRadius: theme.borderRadius.m,
+    marginBottom: theme.spacing.m,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: theme.colors.surfaceHighlight,
+    borderLeftWidth: 4,
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: theme.spacing.m,
+  },
+  titleContainer: {
+    flex: 1,
+    marginRight: theme.spacing.m,
   },
   subjectTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-    marginRight: 12,
+    color: theme.colors.textPrimary,
   },
   badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeToday: {
-    backgroundColor: '#4a90e2',
-  },
-  badgeOverdue: {
-    backgroundColor: '#ff6b6b',
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.round,
+    alignSelf: 'flex-start',
   },
   badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  subjectDate: {
-    fontSize: 14,
-    color: '#666',
+  separator: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.surfaceHighlight,
+    marginBottom: theme.spacing.m,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    marginBottom: theme.spacing.m,
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: theme.spacing.l,
+  },
+  metadataText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
     textTransform: 'capitalize',
+  },
+  reviewButton: {
+    alignSelf: 'flex-end',
+    borderRadius: theme.borderRadius.m,
+    overflow: 'hidden',
+  },
+  reviewButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+  },
+  reviewButtonText: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: theme.spacing.xl,
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 80,
+    marginBottom: theme.spacing.m,
   },
   emptyTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.s,
     textAlign: 'center',
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
-  fab: {
+  fabContainer: {
     position: 'absolute',
-    right: 20,
-    bottom: 20,
+    right: theme.spacing.l,
+    bottom: theme.spacing.l,
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4a90e2',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
     elevation: 8,
   },
   fabText: {
-    color: '#fff',
+    color: theme.colors.textPrimary,
     fontSize: 28,
     fontWeight: '300',
     lineHeight: 28,
