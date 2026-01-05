@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, NativeStackNavigationProp } from '@react-navigation/native';
 import { useSubjectStore } from '../store/subjectStore';
 import { RootStackParamList } from '../types/navigation';
 import MindMapCanvas from '../components/MindMapCanvas';
 import { theme } from '../theme/theme';
+import { ScreenWrapper } from '../components/ScreenWrapper'; // <-- Import du nouveau wrapper
+import { BlurView } from 'expo-blur'; // Optionnel pour le header, sinon View simple
 
 type SubjectScreenRouteProp = RouteProp<RootStackParamList, 'Subject'>;
 type SubjectScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -20,7 +21,6 @@ const SubjectScreen = () => {
   const route = useRoute<SubjectScreenRouteProp>();
   const navigation = useNavigation<SubjectScreenNavigationProp>();
   const { subjects, updateNextReview, deleteSubject } = useSubjectStore();
-  const insets = useSafeAreaInsets();
 
   const subjectId = route.params?.id;
   const subject = useMemo(
@@ -30,31 +30,27 @@ const SubjectScreen = () => {
 
   if (!subject) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Sujet non trouvé</Text>
-      </View>
+      <ScreenWrapper style={styles.centerContainer}>
+        <Text style={styles.errorText}>Sujet introuvable</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+           <Text style={styles.backButtonText}>Retour</Text>
+        </TouchableOpacity>
+      </ScreenWrapper>
     );
   }
 
   const handleDelete = () => {
     Alert.alert(
-      'Supprimer ce sujet ?',
-      'Cette action est irréversible.',
+      'Supprimer ?',
+      'Action irréversible.',
       [
-        {
-          text: 'Annuler',
-          style: 'cancel',
-        },
+        { text: 'Annuler', style: 'cancel' },
         {
           text: 'Supprimer',
           style: 'destructive',
           onPress: async () => {
-            try {
-              await deleteSubject(subject.id);
-              navigation.goBack();
-            } catch (error) {
-              Alert.alert('Erreur', 'Impossible de supprimer le sujet.');
-            }
+            await deleteSubject(subject.id);
+            navigation.goBack();
           },
         },
       ]
@@ -63,158 +59,201 @@ const SubjectScreen = () => {
 
   const handleReview = (difficulty: 'easy' | 'medium' | 'hard') => {
     updateNextReview(subject.id, difficulty);
-    Alert.alert('Révision enregistrée', 'Votre évaluation a été sauvegardée.', [
-      {
-        text: 'OK',
-        onPress: () => navigation.goBack(),
-      },
-    ]);
+    navigation.goBack();
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Text style={styles.headerTitle}>{subject.title}</Text>
-        <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
-          <Text style={styles.deleteButtonText}>🗑️</Text>
+    <ScreenWrapper>
+      {/* Header Minimaliste */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
+          <Text style={styles.iconText}>←</Text>
+        </TouchableOpacity>
+        
+        {/* Titre tronqué si trop long */}
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {subject.title}
+        </Text>
+        
+        <TouchableOpacity onPress={handleDelete} style={[styles.iconButton, styles.deleteButton]}>
+          <Text style={styles.iconText}>🗑️</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Zone Mind Map - Plein écran */}
-      <View style={styles.mindMapContainer}>
-        {subject.mindMap && subject.mindMap.text ? (
+      {/* Canvas Mind Map */}
+      <View style={styles.contentArea}>
+        {subject.mindMap ? (
           <MindMapCanvas rootNode={subject.mindMap} />
         ) : (
-          <View style={styles.emptyMindMapContainer}>
-            <Text style={styles.emptyMindMapText}>Génération en cours...</Text>
+          <View style={styles.centerContainer}>
+            <Text style={styles.loadingText}>Génération de la structure...</Text>
           </View>
         )}
       </View>
 
-      {/* Zone Révision */}
-      <View style={[styles.reviewContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-        <Text style={styles.reviewTitle}>Évaluer la révision</Text>
-        <View style={styles.reviewButtons}>
-          <TouchableOpacity
-            style={[styles.reviewButton, styles.reviewButtonEasy]}
-            onPress={() => handleReview('easy')}
-          >
-            <Text style={styles.reviewButtonText}>Facile</Text>
-          </TouchableOpacity>
+      {/* Footer Flottant (Glass Effect) */}
+      <View style={styles.footerContainer}>
+        <View style={styles.footerGlass}>
+          <Text style={styles.footerLabel}>Difficulté ressentie</Text>
+          
+          <View style={styles.reviewGrid}>
+            <TouchableOpacity
+              style={[styles.reviewButton, styles.btnEasy]}
+              onPress={() => handleReview('easy')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emoji}>🤩</Text>
+              <Text style={styles.btnText}>Facile</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.reviewButton, styles.reviewButtonMedium]}
-            onPress={() => handleReview('medium')}
-          >
-            <Text style={styles.reviewButtonText}>Moyen</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reviewButton, styles.btnMedium]}
+              onPress={() => handleReview('medium')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emoji}>🤔</Text>
+              <Text style={styles.btnText}>Moyen</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.reviewButton, styles.reviewButtonHard]}
-            onPress={() => handleReview('hard')}
-          >
-            <Text style={styles.reviewButtonText}>Difficile</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reviewButton, styles.btnHard]}
+              onPress={() => handleReview('hard')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emoji}>🥵</Text>
+              <Text style={styles.btnText}>Difficile</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+    </ScreenWrapper>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  centerContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    paddingHorizontal: theme.spacing.l,
-    paddingBottom: theme.spacing.m,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    zIndex: 10,
+  },
+  
+  // --- HEADER ---
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
     flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  mindMapContainer: {
-    flex: 1, // Prend tout l'espace disponible
-  },
-  emptyMindMapContainer: {
-    flex: 1,
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  emptyMindMapText: {
-    fontSize: 16,
+  deleteButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)', // Rouge subtil
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  iconText: {
+    fontSize: 18,
+    color: theme.colors.textPrimary,
+  },
+
+  // --- CONTENT ---
+  contentArea: {
+    flex: 1,
+  },
+  loadingText: {
     color: theme.colors.textSecondary,
     fontStyle: 'italic',
   },
-  reviewContainer: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.m,
-    paddingTop: theme.spacing.m,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.surfaceHighlight,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  reviewTitle: {
+  errorText: {
+    color: theme.colors.error,
     fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.s,
-    textAlign: 'center',
+    marginBottom: 20,
   },
-  reviewButtons: {
+  backButton: {
+    padding: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: theme.colors.textPrimary,
+  },
+
+  // --- FOOTER ---
+  footerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  footerGlass: {
+    backgroundColor: theme.colors.surface, // Fallback glass
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.card,
+  },
+  footerLabel: {
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 12,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  reviewGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: theme.spacing.s,
+    gap: 12,
   },
   reviewButton: {
     flex: 1,
-    paddingVertical: theme.spacing.m,
-    paddingHorizontal: theme.spacing.m,
-    borderRadius: theme.borderRadius.m,
+    paddingVertical: 12,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
-  reviewButtonEasy: {
-    backgroundColor: theme.colors.success,
+  // Couleurs des boutons (Subtiles avec bordures colorées)
+  btnEasy: {
+    borderColor: theme.colors.success,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
-  reviewButtonMedium: {
-    backgroundColor: theme.colors.warning,
+  btnMedium: {
+    borderColor: theme.colors.warning,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
   },
-  reviewButtonHard: {
-    backgroundColor: theme.colors.error,
+  btnHard: {
+    borderColor: theme.colors.error,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
-  reviewButtonText: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  errorText: {
-    fontSize: 18,
-    color: theme.colors.error,
-    textAlign: 'center',
-  },
-  deleteButton: {
-    padding: theme.spacing.s,
-  },
-  deleteButtonText: {
+  emoji: {
     fontSize: 20,
+    marginBottom: 4,
+  },
+  btnText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
 });
 
 export default SubjectScreen;
-

@@ -1,27 +1,28 @@
 export const theme = {
   colors: {
-    // Backgrounds (Inspiré de Driver App - Dark Mode profond)
-    background: '#0F1115', // Noir très profond
-    surface: '#181B21',    // Gris anthracite pour les cartes
-    surfaceHighlight: '#23262F', // Bordures subtiles
+    // FOND : Un noir profond mais pas absolu pour laisser vivre les ombres
+    background: '#09090B', 
     
-    // Brand Gradient (Chaleureux & Énergique)
-    primary: '#FF9F0A', // Orange vibrant
-    secondary: '#FF3B30', // Rouge orangé (pour le dégradé)
+    // SURFACE (Glass) : Noir avec transparence pour l'effet de superposition
+    surface: 'rgba(30, 30, 35, 0.7)',
+    surfaceLight: 'rgba(255, 255, 255, 0.05)', // Pour les items survolés ou actifs
     
-    // Accents & UI
-    accent: '#FFB74D', // Ambre doux (Focus)
-    glass: 'rgba(255, 255, 255, 0.05)', // Effet verre
-
-    // Functional
-    success: '#34C759', // Vert Apple
-    warning: '#FFD60A',
-    error: '#FF453A',
-
-    // Text
+    // BORDURES : Très subtiles, essentielles pour le glassmorphism
+    border: 'rgba(255, 255, 255, 0.1)',
+    
+    // ACCENT ÉNERGIQUE : Orange électrique
+    primary: '#FF6B00', 
+    primaryGradient: ['#FF6B00', '#FF9F0A'], // Pour les dégradés de boutons
+    
+    // TEXTE
     textPrimary: '#FFFFFF',
-    textSecondary: '#8E9BB3', // Gris bleuté lisible
-    textTertiary: '#5C667A',
+    textSecondary: '#A1A1AA', // Gris zinc lisible
+    textTertiary: '#52525B',
+
+    // STATUS
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
   },
   
   spacing: {
@@ -35,9 +36,26 @@ export const theme = {
 
   borderRadius: {
     s: 8,
-    m: 16, // Standard pour les cartes
+    m: 16,
     l: 24,
     xl: 32,
-    round: 999,
   },
+
+  // OMBRES PRÉ-DÉFINIES (Shadow generator style)
+  shadows: {
+    card: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    glow: {
+      shadowColor: "#FF6B00",
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.4,
+      shadowRadius: 10,
+      elevation: 5,
+    }
+  }
 };

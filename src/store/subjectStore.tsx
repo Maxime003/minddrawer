@@ -7,8 +7,8 @@ import { calculateSM2 } from '../utils/sm2';
 
 interface SubjectContextType {
   subjects: Subject[];
-  createSubject: (input: CreateSubjectInput) => Promise<string>; // On passe en Promise !
-  updateNextReview: (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => void;
+  createSubject: (input: CreateSubjectInput) => Promise<string>;
+  updateNextReview: (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => Promise<void>;
   deleteSubject: (id: string) => Promise<void>;
 }
 
@@ -18,14 +18,7 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const { user } = useAuth();
 
-  // Fonction Helper pour créer la date J+1
-  const getNextDay = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + 1);
-    return date;
-  };
-
-  // Fonction pour charger les sujets depuis Supabase
+  // Chargement des sujets depuis Supabase
   const fetchSubjects = async () => {
     if (!user) {
       setSubjects([]);
@@ -44,7 +37,6 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return;
       }
 
-      // Mapping snake_case (DB) -> camelCase (App)
       const mappedSubjects: Subject[] = (data || []).map((item) => ({
         id: item.id,
         title: item.title,
@@ -64,29 +56,32 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  // Chargement des sujets quand l'utilisateur change
   useEffect(() => {
     fetchSubjects();
   }, [user]);
 
   const createSubject = async (input: CreateSubjectInput): Promise<string> => {
-    if (!user) {
-      throw new Error('Utilisateur non connecté');
-    }
+    if (!user) throw new Error('Utilisateur non connecté');
 
-    // 1. On appelle l'IA (ou le mock si ça plante)
+    // 1. Génération IA ou Mock en cas d'erreur
     let generatedMindMap: MindMapNode;
     try {
       generatedMindMap = await generateMindMap(input.title, input.context, input.rawNotes);
     } catch (e) {
-      console.log("Fallback mock utilisé");
-      generatedMindMap = { id: "err", text: "Erreur", children: [] };
+      console.log("Erreur IA, utilisation d'une structure vide", e);
+      generatedMindMap = { 
+        id: "root", 
+        text: input.title, 
+        children: [{ id: "err", text: "Génération échouée, réessayez plus tard" }] 
+      };
     }
 
     const now = new Date();
+    // CORRECTION : Prochaine révision à J+1 (Demain)
     const nextReviewAt = new Date();
+    nextReviewAt.setDate(now.getDate() + 1);
 
-    // 2. Insertion en base de données (mapping camelCase -> snake_case)
+    // 2. Insertion Supabase
     const { data, error } = await supabase
       .from('subjects')
       .insert({
@@ -105,11 +100,11 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       .single();
 
     if (error) {
-      console.error('Erreur lors de la création du sujet:', error);
+      console.error('Erreur insert subject:', error);
       throw error;
     }
 
-    // 3. Mise à jour de l'état local avec le sujet créé
+    // 3. Update local
     const newSubject: Subject = {
       id: data.id,
       title: data.title,
@@ -128,22 +123,12 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateNextReview = async (subjectId: string, difficulty: 'easy' | 'medium' | 'hard') => {
-    // Trouver le sujet actuel
     const currentSubject = subjects.find((s) => s.id === subjectId);
-    if (!currentSubject) {
-      console.error('Sujet non trouvé:', subjectId);
-      return;
-    }
+    if (!currentSubject) return;
 
-    // Mapping des difficultés vers les qualités SM-2
-    const qualityMap = {
-      hard: 3,
-      medium: 4,
-      easy: 5,
-    };
+    const qualityMap = { hard: 3, medium: 4, easy: 5 };
     const quality = qualityMap[difficulty];
 
-    // Calcul SM-2
     const sm2Result = calculateSM2(
       quality,
       currentSubject.lastInterval,
@@ -151,11 +136,10 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       currentSubject.difficultyFactor
     );
 
-    // Calcul de la nouvelle date de révision
     const now = new Date();
     const newNextReviewAt = new Date(now);
     newNextReviewAt.setDate(now.getDate() + sm2Result.interval);
-    // Mise à jour en base de données
+
     const { error } = await supabase
       .from('subjects')
       .update({
@@ -167,11 +151,10 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       .eq('id', subjectId);
 
     if (error) {
-      console.error('Erreur lors de la mise à jour du sujet:', error);
+      console.error('Erreur update review:', error);
       return;
     }
 
-    // Mise à jour de l'état local
     setSubjects((prev) =>
       prev.map((subject) =>
         subject.id === subjectId
@@ -188,19 +171,9 @@ export const SubjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const deleteSubject = async (subjectId: string): Promise<void> => {
-    // Suppression en base de données
-    const { error } = await supabase
-      .from('subjects')
-      .delete()
-      .eq('id', subjectId);
-
-    if (error) {
-      console.error('Erreur lors de la suppression du sujet:', error);
-      throw error;
-    }
-
-    // Mise à jour de l'état local en filtrant l'ID supprimé
-    setSubjects((prev) => prev.filter((subject) => subject.id !== subjectId));
+    const { error } = await supabase.from('subjects').delete().eq('id', subjectId);
+    if (error) throw error;
+    setSubjects((prev) => prev.filter((s) => s.id !== subjectId));
   };
 
   return (
