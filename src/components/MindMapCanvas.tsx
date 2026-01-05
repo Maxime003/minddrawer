@@ -1,20 +1,36 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { MindMapNode } from '../types/subject';
 import { theme } from '../theme/theme';
-import { LinearGradient } from 'expo-linear-gradient';
 
 interface MindMapCanvasProps {
   rootNode: MindMapNode;
 }
 
-const MindMapItem: React.FC<{ node: MindMapNode; level: number; isLast?: boolean }> = ({ 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// On définit le padding ici pour l'utiliser dans le calcul de largeur
+const HORIZONTAL_PADDING = 20;
+
+// Palette de couleurs pour les niveaux
+const LEVEL_COLORS = [
+  theme.colors.primary, 
+  '#60A5FA',            
+  '#A78BFA',            
+  '#34D399',            
+  '#F472B6',            
+];
+
+const getNodeColor = (level: number) => {
+  return LEVEL_COLORS[level % LEVEL_COLORS.length];
+};
+
+const MindMapItem: React.FC<{ node: MindMapNode; level: number }> = ({ 
   node, 
   level, 
-  isLast = false 
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const isRoot = level === 0;
+  const nodeColor = getNodeColor(level);
 
   return (
     <View style={styles.itemWrapper}>
@@ -24,7 +40,6 @@ const MindMapItem: React.FC<{ node: MindMapNode; level: number; isLast?: boolean
         {/* Lignes de connexion (Pour les enfants uniquement) */}
         {!isRoot && (
           <View style={styles.connectorContainer}>
-             {/* Ligne courbe qui vient du parent */}
              <View style={styles.connectorElbow} />
           </View>
         )}
@@ -33,12 +48,12 @@ const MindMapItem: React.FC<{ node: MindMapNode; level: number; isLast?: boolean
         <View style={[
             styles.cardBase, 
             isRoot ? styles.cardRoot : styles.cardChild,
-            theme.shadows.card
+            theme.shadows.card,
+            { borderColor: isRoot ? theme.colors.primary : nodeColor + '40' }
         ]}>
-            {/* Indicateur coloré */}
             <View style={[
               styles.indicator, 
-              isRoot ? styles.indicatorRoot : styles.indicatorChild 
+              { backgroundColor: nodeColor }
             ]} />
             
             <Text style={[
@@ -50,19 +65,16 @@ const MindMapItem: React.FC<{ node: MindMapNode; level: number; isLast?: boolean
         </View>
       </View>
 
-      {/* 2. LES ENFANTS (Récursion) */}
+      {/* 2. LES ENFANTS */}
       {hasChildren && (
         <View style={styles.childrenContainer}>
-          {/* Ligne verticale continue qui longe les enfants */}
-          <View style={styles.verticalLine} />
-          
+          <View style={[styles.verticalLine, { backgroundColor: nodeColor + '20' }]} />
           <View style={styles.childrenContent}>
             {node.children!.map((child, index) => (
               <MindMapItem 
                 key={child.id || index} 
                 node={child} 
                 level={level + 1}
-                isLast={index === node.children!.length - 1}
               />
             ))}
           </View>
@@ -78,8 +90,21 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode }) => {
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false} 
     >
-      <MindMapItem node={rootNode} level={0} />
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }} // Permet au contenu de remplir l'écran
+      >
+         {/* CORRECTION : On soustrait le padding de la largeur minimale forcée */}
+         <View style={[
+           styles.horizontalScrollWrapper, 
+           { minWidth: SCREEN_WIDTH - (HORIZONTAL_PADDING * 2) }
+         ]}>
+            <MindMapItem node={rootNode} level={0} />
+         </View>
+      </ScrollView>
     </ScrollView>
   );
 };
@@ -87,113 +112,107 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // Transparent car géré par ScreenWrapper
     backgroundColor: 'transparent',
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 100, // Espace pour le footer
+    paddingVertical: 20,
+    paddingBottom: 100,
+  },
+  horizontalScrollWrapper: {
+    paddingHorizontal: HORIZONTAL_PADDING, // 20px de chaque côté
+    // Le minWidth est géré inline pour le calcul dynamique
   },
   itemWrapper: {
-    marginBottom: 0,
+    width: '100%',
   },
   
-  // --- LAYOUT ARBORESCENCE ---
+  // --- LAYOUT ---
   nodeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    width: '100%',
+    // On enlève le paddingRight ici car il est géré par le wrapper principal maintenant
   },
   childrenContainer: {
     flexDirection: 'row',
+    width: '100%',
   },
   childrenContent: {
     flex: 1,
+    flexDirection: 'column',
   },
 
-  // --- CONNECTEURS (LIGNES) ---
+  // --- CONNECTEURS ---
   connectorContainer: {
     width: 24,
-    height: 40, // Hauteur ajustée pour aligner avec le milieu de la carte
+    height: 30, 
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
-  // Le "Coude" (Ligne qui part de la gauche et remonte)
   connectorElbow: {
     position: 'absolute',
-    left: 0, // Collé à la ligne verticale du parent
-    top: -20, // Remonte vers le parent
-    bottom: '50%', // S'arrête au milieu de la hauteur de la ligne
+    left: 0,
+    top: -24, 
+    bottom: '50%',
     width: 16,
     borderBottomWidth: 2,
     borderLeftWidth: 2,
-    borderBottomLeftRadius: 12, // Arrondi joli
-    borderColor: theme.colors.textSecondary,
-    opacity: 0.3,
+    borderBottomLeftRadius: 12,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  // La ligne verticale continue à gauche des enfants
   verticalLine: {
     width: 2,
-    backgroundColor: theme.colors.textSecondary,
-    opacity: 0.3,
-    marginLeft: 0, // Doit s'aligner avec le borderLeft du connectorElbow
-    marginRight: 22, // Espace avant le contenu des enfants
-    flexGrow: 1,
+    marginLeft: 0, 
+    marginRight: 16,
   },
 
-  // --- CARDS DESIGN (Glassmorphism) ---
+  // --- CARDS ---
   cardBase: {
-    flex: 1,
+    flex: 1, // Stretch
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 12,
+    padding: 16,
+    minWidth: 150,
   },
   cardRoot: {
-    backgroundColor: 'rgba(255, 107, 0, 0.15)', // Teinte orange subtile
-    borderColor: 'rgba(255, 107, 0, 0.3)',
-    marginBottom: 16,
-    paddingVertical: 18,
+    backgroundColor: 'rgba(255, 107, 0, 0.1)',
+    marginBottom: 24,
+    paddingVertical: 20,
   },
-  cardChild: {
-    // Style par défaut
-  },
+  cardChild: {},
 
-  // --- INDICATEURS (Puces) ---
+  // --- INDICATEURS ---
   indicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 12,
+    width: 4,
+    height: '100%',
+    minHeight: 16,
+    borderRadius: 2,
+    marginRight: 14,
   },
   indicatorRoot: {
-    backgroundColor: theme.colors.primary,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  indicatorChild: {
-    backgroundColor: theme.colors.textSecondary,
+    width: 6,
+    height: 20,
   },
 
-  // --- TYPOGRAPHIE ---
+  // --- TEXTE ---
   text: {
-    color: theme.colors.textPrimary,
-    flex: 1,
+    flex: 1, 
+    flexWrap: 'wrap',
   },
   textRoot: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#FFF',
     letterSpacing: 0.5,
   },
   textChild: {
     fontSize: 15,
-    fontWeight: '400',
-    color: '#E4E4E7', // Zinc-200
+    fontWeight: '500',
+    color: '#E4E4E7',
     lineHeight: 22,
   },
 });
