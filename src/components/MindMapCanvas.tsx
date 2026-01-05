@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { ReactNativeZoomableView } from '@dudigital/react-native-zoomable-view'; // Garde les accolades
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { MindMapNode } from '../types/subject';
 import { calculateRadialLayout, ComputedNode, ComputedEdge } from '../utils/layoutEngine';
@@ -11,46 +12,71 @@ interface MindMapCanvasProps {
   onNodePress?: (node: ComputedNode) => void;
 }
 
-// On garde une taille confortable mais pas excessive
-const CANVAS_SIZE = 2000;
-const CANVAS_CENTER = CANVAS_SIZE / 2;
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+// Dimensions et Configuration
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const CANVAS_SIZE = 4000; // Espace virtuel large
+const CENTER = CANVAS_SIZE / 2;
 
 const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) => {
-  const zoomRef = useRef<ReactNativeZoomableView | null>(null);
-  const [layoutReady, setLayoutReady] = useState(false);
+  // --- MOTEUR PHYSIQUE (Reanimated) ---
+  
+  // 1. Calcul pour centrer le canvas (0,0) au milieu de l'écran au démarrage
+  const initialX = (SCREEN_W - CANVAS_SIZE) / 2;
+  const initialY = (SCREEN_H - CANVAS_SIZE) / 2;
 
-  // Calcul du layout
+  // 2. Valeurs partagées pour l'animation (Thread UI - 60 FPS)
+  const translateX = useSharedValue(initialX);
+  const translateY = useSharedValue(initialY);
+  const scale = useSharedValue(1);
+  
+  // Mémoire pour les gestes continus
+  const savedTranslateX = useSharedValue(initialX);
+  const savedTranslateY = useSharedValue(initialY);
+  const savedScale = useSharedValue(1);
+
+  // --- GESTES ---
+
+  // Pan (Déplacement)
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      translateX.value = savedTranslateX.value + e.translationX;
+      translateY.value = savedTranslateY.value + e.translationY;
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  // Pinch (Zoom)
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = savedScale.value * e.scale;
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+    });
+
+  // Combinaison des gestes
+  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+  // Style animé optimisé
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  // --- RENDU DATA ---
   const { nodes, edges } = useMemo(() => calculateRadialLayout(rootNode), [rootNode]);
 
-  // Fonction pour centrer la caméra programmeatiquement
-  const centerCamera = () => {
-    if (zoomRef.current) {
-      // Le but : Placer le point (1000, 1000) au centre de ton écran.
-      // Offset X = (Moitié Ecran) - 1000
-      // Offset Y = (Moitié Ecran) - 1000
-      const targetX = (screenWidth / 2) - CANVAS_CENTER;
-      const targetY = (screenHeight / 2) - CANVAS_CENTER;
-
-      // On force le déplacement immédiat
-      zoomRef.current.moveTo(targetX, targetY);
-    }
-  };
-
-  // On centre une fois au démarrage, après un court délai pour être sûr que tout est chargé
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      centerCamera();
-    }, 100); // 100ms de délai pour laisser le temps au moteur de rendu
-    return () => clearTimeout(timer);
-  }, []);
-
+  // Courbes de Bézier
   const createEdgePath = (edge: ComputedEdge): string => {
-    const sx = edge.source.x + CANVAS_CENTER;
-    const sy = edge.source.y + CANVAS_CENTER;
-    const tx = edge.target.x + CANVAS_CENTER;
-    const ty = edge.target.y + CANVAS_CENTER;
+    const sx = edge.source.x + CENTER;
+    const sy = edge.source.y + CENTER;
+    const tx = edge.target.x + CENTER;
+    const ty = edge.target.y + CENTER;
 
     const midX = (sx + tx) / 2;
     const midY = (sy + ty) / 2;
@@ -60,86 +86,76 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
     return `M ${sx} ${sy} Q ${midX - dy * 0.3} ${midY + dx * 0.3} ${tx} ${ty}`;
   };
 
+  // Fonction de Reset (Recentrage)
+  const resetCamera = () => {
+    translateX.value = withSpring(initialX);
+    translateY.value = withSpring(initialY);
+    scale.value = withSpring(1);
+    // Reset des valeurs sauvegardées
+    savedTranslateX.value = initialX;
+    savedTranslateY.value = initialY;
+    savedScale.value = 1;
+  };
+
   return (
-    <View style={styles.container}>
-      <ReactNativeZoomableView
-        ref={zoomRef}
-        // Liberté totale de zoom
-        maxZoom={2}
-        minZoom={0.2}
-        zoomStep={0.5}
-        initialZoom={1}
-        // CRUCIAL : On désactive les bordures pour éviter le "snap back" (disparition)
-        bindToBorders={false}
-        // CRUCIAL : On active le pan
-        panEnabled={true}
-        zoomEnabled={true}
-        // IMPORTANT : On NE PASSE PAS contentWidth/Height ici pour éviter les conflits
-        style={styles.zoomableView}
-        // Un double tap pour recentrer si on est perdu
-        onDoubleTapAfter={centerCamera}
-      >
-        {/* Le Conteneur du Canvas.
-            J'ai ajouté une bordure temporaire (opacity 0.1) pour que tu puisses voir les limites
-            si jamais tu te perds.
-        */}
-        <View style={styles.canvasContainer}>
+    <GestureHandlerRootView style={styles.container}>
+      <GestureDetector gesture={composedGesture}>
+        <Animated.View style={[styles.canvas, animatedStyle]}>
           
-          {/* Couche SVG (Lignes) */}
-          {/* pointerEvents="none" est vital : il laisse passer tes doigts à travers les lignes */}
-          <View style={styles.svgLayerWrapper} pointerEvents="none">
+          {/* Surface tactile invisible pour capturer le Pan partout */}
+          <View style={styles.touchSurface} />
+
+          {/* Calque SVG (Lignes) */}
+          <View style={styles.layer} pointerEvents="none">
             <Svg width={CANVAS_SIZE} height={CANVAS_SIZE}>
-                {edges.map((edge) => (
+              {edges.map((edge) => (
                 <Path
-                    key={edge.id}
-                    d={createEdgePath(edge)}
-                    fill="none"
-                    stroke={theme.colors.surfaceHighlight}
-                    strokeWidth={2}
-                    opacity={0.6}
+                  key={edge.id}
+                  d={createEdgePath(edge)}
+                  fill="none"
+                  stroke={theme.colors.surfaceHighlight}
+                  strokeWidth={2}
+                  opacity={0.6}
                 />
-                ))}
+              ))}
             </Svg>
           </View>
 
-          {/* Couche Nœuds (Cartes) */}
+          {/* Nœuds */}
           {nodes.map((node) => {
             const isRoot = node.level === 0;
-            const nodeX = node.x + CANVAS_CENTER;
-            const nodeY = node.y + CANVAS_CENTER;
+            const left = node.x + CENTER;
+            const top = node.y + CENTER;
 
             return (
               <TouchableOpacity
                 key={node.id}
                 style={[
-                  styles.nodeContainer,
-                  {
-                    left: nodeX - 100, // Centrage horizontal (largeur 200)
-                    top: nodeY - 30,  // Centrage vertical
-                  },
-                  isRoot ? styles.rootNode : styles.childNode,
+                  styles.nodeWrapper,
+                  { left: left - 100, top: top - 30 },
+                  { zIndex: isRoot ? 20 : 10 }
                 ]}
                 onPress={() => onNodePress && onNodePress(node)}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
               >
-                <View style={[styles.nodeCard, isRoot ? styles.rootCard : styles.childCard]}>
-                  <Text style={[styles.nodeText, isRoot ? styles.rootText : styles.childText]} numberOfLines={3}>
+                <View style={[styles.card, isRoot ? styles.rootCard : styles.childCard]}>
+                  <Text style={[styles.text, isRoot ? styles.rootText : styles.childText]} numberOfLines={3}>
                     {node.text}
                   </Text>
-                  
-                  {!isRoot && <View style={styles.connectionDot} />}
+                  {!isRoot && <View style={styles.dot} />}
                 </View>
               </TouchableOpacity>
             );
           })}
-        </View>
-      </ReactNativeZoomableView>
-      
-      {/* Bouton flottant de Recentrage (Optionnel, utile pour debug) */}
-      <TouchableOpacity style={styles.centerButton} onPress={centerCamera}>
-        <Text style={{fontSize: 20}}>🎯</Text>
+
+        </Animated.View>
+      </GestureDetector>
+
+      {/* Bouton de Recentrage */}
+      <TouchableOpacity style={styles.fab} onPress={resetCamera}>
+        <Text style={{ fontSize: 24 }}>🎯</Text>
       </TouchableOpacity>
-    </View>
+    </GestureHandlerRootView>
   );
 };
 
@@ -149,42 +165,31 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     overflow: 'hidden',
   },
-  zoomableView: {
-    flex: 1,
-  },
-  canvasContainer: {
+  canvas: {
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
-    // Cette couleur de fond est INDISPENSABLE pour que le Pan fonctionne dans le vide
-    backgroundColor: 'rgba(255, 255, 255, 0.02)', 
-    // Bordure de debug (très subtile) pour voir les limites du terrain de jeu
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  svgLayerWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: CANVAS_SIZE,
-    height: CANVAS_SIZE,
-    zIndex: 0,
+  touchSurface: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.001)', // Crucial pour le geste Pan
   },
-  nodeContainer: {
+  layer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  nodeWrapper: {
     position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 200, 
+    width: 200,
     height: 60,
-    zIndex: 10,
-  },
-  nodeCard: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    borderRadius: theme.borderRadius.m,
-    minWidth: 100,
-    maxWidth: 180,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  card: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: 180,
   },
   rootCard: {
     backgroundColor: theme.colors.surface,
@@ -192,56 +197,55 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
     shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    paddingVertical: theme.spacing.m,
-    minWidth: 140,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+    minWidth: 120,
   },
   childCard: {
-    backgroundColor: 'rgba(30, 34, 43, 0.95)',
+    backgroundColor: 'rgba(30, 34, 43, 0.9)',
     borderWidth: 1,
     borderColor: theme.colors.surfaceHighlight,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
     elevation: 3,
   },
-  nodeText: {
+  text: {
     color: theme.colors.textPrimary,
     textAlign: 'center',
   },
   rootText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'bold',
   },
   childText: {
     fontSize: 13,
     fontWeight: '500',
   },
-  rootNode: { zIndex: 100 },
-  childNode: { zIndex: 50 },
-  connectionDot: {
+  dot: {
     position: 'absolute',
-    left: -5,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    left: -6,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: theme.colors.accent,
     borderWidth: 2,
     borderColor: theme.colors.surface,
   },
-  centerButton: {
+  fab: {
     position: 'absolute',
     bottom: 40,
     right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: theme.colors.surface,
-    padding: 12,
-    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: theme.colors.surfaceHighlight,
     elevation: 5,
-    zIndex: 200,
   }
 });
 
