@@ -1,7 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-// 👇 Toujours l'import nommé avec les accolades
-import { ReactNativeZoomableView } from '@dudigital/react-native-zoomable-view';
+import { ReactNativeZoomableView } from '@dudigital/react-native-zoomable-view'; // Garde les accolades
 import Svg, { Path } from 'react-native-svg';
 import { MindMapNode } from '../types/subject';
 import { calculateRadialLayout, ComputedNode, ComputedEdge } from '../utils/layoutEngine';
@@ -12,22 +11,40 @@ interface MindMapCanvasProps {
   onNodePress?: (node: ComputedNode) => void;
 }
 
+// On garde une taille confortable mais pas excessive
 const CANVAS_SIZE = 2000;
 const CANVAS_CENTER = CANVAS_SIZE / 2;
 
-// On récupère les dimensions de l'écran pour calculer le centre
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) => {
+  const zoomRef = useRef<ReactNativeZoomableView | null>(null);
+  const [layoutReady, setLayoutReady] = useState(false);
+
   // Calcul du layout
   const { nodes, edges } = useMemo(() => calculateRadialLayout(rootNode), [rootNode]);
 
-  // --- CALCUL DU CENTRAGE (Correction) ---
-  // On veut que le pixel 1000 (Centre Canvas) soit au milieu de l'écran.
-  // Décalage = (Moitié Ecran) - (Centre Canvas)
-  // Ex: 200 - 1000 = -800.
-  const initialOffsetX = (screenWidth / 2) - CANVAS_CENTER;
-  const initialOffsetY = (screenHeight / 2) - CANVAS_CENTER;
+  // Fonction pour centrer la caméra programmeatiquement
+  const centerCamera = () => {
+    if (zoomRef.current) {
+      // Le but : Placer le point (1000, 1000) au centre de ton écran.
+      // Offset X = (Moitié Ecran) - 1000
+      // Offset Y = (Moitié Ecran) - 1000
+      const targetX = (screenWidth / 2) - CANVAS_CENTER;
+      const targetY = (screenHeight / 2) - CANVAS_CENTER;
+
+      // On force le déplacement immédiat
+      zoomRef.current.moveTo(targetX, targetY);
+    }
+  };
+
+  // On centre une fois au démarrage, après un court délai pour être sûr que tout est chargé
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      centerCamera();
+    }, 100); // 100ms de délai pour laisser le temps au moteur de rendu
+    return () => clearTimeout(timer);
+  }, []);
 
   const createEdgePath = (edge: ComputedEdge): string => {
     const sx = edge.source.x + CANVAS_CENTER;
@@ -43,30 +60,33 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
     return `M ${sx} ${sy} Q ${midX - dy * 0.3} ${midY + dx * 0.3} ${tx} ${ty}`;
   };
 
-  const handleNodePress = (node: ComputedNode) => {
-    if (onNodePress) onNodePress(node);
-  };
-
   return (
     <View style={styles.container}>
       <ReactNativeZoomableView
+        ref={zoomRef}
+        // Liberté totale de zoom
         maxZoom={2}
         minZoom={0.2}
         zoomStep={0.5}
         initialZoom={1}
-        bindToBorders={false} // Important : permet de se balader librement
+        // CRUCIAL : On désactive les bordures pour éviter le "snap back" (disparition)
+        bindToBorders={false}
+        // CRUCIAL : On active le pan
         panEnabled={true}
         zoomEnabled={true}
-        // 👇 C'EST ICI QUE C'ETAIT MANQUANT : On passe les offsets calculés
-        initialOffsetX={initialOffsetX}
-        initialOffsetY={initialOffsetY}
-        // 👇 On retire contentWidth/Height pour éviter de bloquer le Pan
+        // IMPORTANT : On NE PASSE PAS contentWidth/Height ici pour éviter les conflits
         style={styles.zoomableView}
+        // Un double tap pour recentrer si on est perdu
+        onDoubleTapAfter={centerCamera}
       >
+        {/* Le Conteneur du Canvas.
+            J'ai ajouté une bordure temporaire (opacity 0.1) pour que tu puisses voir les limites
+            si jamais tu te perds.
+        */}
         <View style={styles.canvasContainer}>
           
           {/* Couche SVG (Lignes) */}
-          {/* pointerEvents="none" laisse passer le clic au travers vers le fond pour le Pan */}
+          {/* pointerEvents="none" est vital : il laisse passer tes doigts à travers les lignes */}
           <View style={styles.svgLayerWrapper} pointerEvents="none">
             <Svg width={CANVAS_SIZE} height={CANVAS_SIZE}>
                 {edges.map((edge) => (
@@ -99,7 +119,7 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
                   },
                   isRoot ? styles.rootNode : styles.childNode,
                 ]}
-                onPress={() => handleNodePress(node)}
+                onPress={() => onNodePress && onNodePress(node)}
                 activeOpacity={0.7}
               >
                 <View style={[styles.nodeCard, isRoot ? styles.rootCard : styles.childCard]}>
@@ -114,6 +134,11 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode, onNodePress }) 
           })}
         </View>
       </ReactNativeZoomableView>
+      
+      {/* Bouton flottant de Recentrage (Optionnel, utile pour debug) */}
+      <TouchableOpacity style={styles.centerButton} onPress={centerCamera}>
+        <Text style={{fontSize: 20}}>🎯</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -130,8 +155,11 @@ const styles = StyleSheet.create({
   canvasContainer: {
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
-    // Une couleur de fond quasi-invisible est nécessaire pour capter le "drag" (Pan)
-    backgroundColor: 'rgba(255,255,255, 0.001)', 
+    // Cette couleur de fond est INDISPENSABLE pour que le Pan fonctionne dans le vide
+    backgroundColor: 'rgba(255, 255, 255, 0.02)', 
+    // Bordure de debug (très subtile) pour voir les limites du terrain de jeu
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   svgLayerWrapper: {
     position: 'absolute',
@@ -203,6 +231,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.surface,
   },
+  centerButton: {
+    position: 'absolute',
+    bottom: 40,
+    right: 20,
+    backgroundColor: theme.colors.surface,
+    padding: 12,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceHighlight,
+    elevation: 5,
+    zIndex: 200,
+  }
 });
 
 export default MindMapCanvas;
