@@ -1,7 +1,7 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-// 👇 1. Import indispensable pour le moteur de gestes
+// 👇 Import vital pour les gestes
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import RootNavigator from './src/navigation/RootNavigator';
@@ -10,6 +10,7 @@ import { SubjectProvider } from './src/store/subjectStore';
 
 export default function App() {
   return (
+    // 👇 Wrapper indispensable avec style flex: 1
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
