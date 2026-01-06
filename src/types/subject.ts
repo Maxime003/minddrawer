@@ -1,6 +1,7 @@
 export interface MindMapNode {
   id: string;
   text: string;
+  description?: string; // <--- Le détail de la notion
   children?: MindMapNode[];
 }
 

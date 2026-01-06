@@ -1,17 +1,71 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  LayoutAnimation, 
+  Platform, 
+  UIManager 
+} from 'react-native';
 import { MindMapNode } from '../types/subject';
 import { theme } from '../theme/theme';
+
+// Active LayoutAnimation sur Android
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface MindMapCanvasProps {
   rootNode: MindMapNode;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-// On définit le padding ici pour l'utiliser dans le calcul de largeur
-const HORIZONTAL_PADDING = 20;
+// --- STYLES HIÉRARCHIQUES ---
+const getLevelStyles = (level: number) => {
+  switch (level) {
+    case 0: // RACINE
+      return {
+        width: 400,
+        padding: 20,
+        fontSize: 24,
+        fontWeight: '800' as const,
+        color: '#FFFFFF',
+        opacity: 1,
+      };
+    case 1: // SECTIONS
+      return {
+        width: 380,
+        padding: 18,
+        fontSize: 18,
+        fontWeight: '700' as const,
+        color: '#F4F4F5',
+        opacity: 0.95,
+      };
+    case 2: // SOUS-SECTIONS
+      return {
+        width: 350,
+        padding: 16,
+        fontSize: 15,
+        fontWeight: '500' as const,
+        color: '#E4E4E7',
+        opacity: 0.9,
+      };
+    default: // DÉTAILS
+      return {
+        width: 260,
+        padding: 12,
+        fontSize: 13,
+        fontWeight: '400' as const,
+        color: '#A1A1AA',
+        opacity: 0.85,
+      };
+  }
+};
 
-// Palette de couleurs pour les niveaux
 const LEVEL_COLORS = [
   theme.colors.primary, 
   '#60A5FA',            
@@ -28,44 +82,80 @@ const MindMapItem: React.FC<{ node: MindMapNode; level: number }> = ({
   node, 
   level, 
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false); // État d'ouverture
+  
   const hasChildren = node.children && node.children.length > 0;
   const isRoot = level === 0;
   const nodeColor = getNodeColor(level);
+  const levelStyle = getLevelStyles(level);
+
+  // Fonction pour basculer l'état avec animation
+  const toggleExpand = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsExpanded(!isExpanded);
+  };
+
+  // Simulation de description si elle n'existe pas encore (pour tester le design)
+  const description = node.description || "Tape ici pour voir plus de détails sur ce concept clé. Ce texte explicatif permet de mieux comprendre le point abordé.";
 
   return (
     <View style={styles.itemWrapper}>
-      {/* 1. LE NŒUD (CARD) */}
       <View style={styles.nodeRow}>
         
-        {/* Lignes de connexion (Pour les enfants uniquement) */}
+        {/* Connecteur */}
         {!isRoot && (
           <View style={styles.connectorContainer}>
              <View style={styles.connectorElbow} />
           </View>
         )}
 
-        {/* Le contenu (Glass Card) */}
-        <View style={[
+        {/* LA CARTE INTERACTIVE */}
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={toggleExpand}
+          style={[
             styles.cardBase, 
-            isRoot ? styles.cardRoot : styles.cardChild,
             theme.shadows.card,
-            { borderColor: isRoot ? theme.colors.primary : nodeColor + '40' }
+            { 
+              width: levelStyle.width,
+              padding: levelStyle.padding,
+              borderWidth: isRoot ? 2 : 1,
+              borderColor: isRoot ? theme.colors.primary : nodeColor + '30',
+              backgroundColor: isRoot ? 'rgba(255, 107, 0, 0.15)' : theme.colors.surface,
+            }
         ]}>
-            <View style={[
-              styles.indicator, 
-              { backgroundColor: nodeColor }
-            ]} />
-            
-            <Text style={[
-              styles.text, 
-              isRoot ? styles.textRoot : styles.textChild
-            ]}>
-              {node.text}
-            </Text>
-        </View>
+            {/* Ligne principale : Indicateur + Titre (CHEVRON RETIRÉ) */}
+            <View style={styles.cardHeaderRow}>
+              <View style={[
+                styles.indicator, 
+                { backgroundColor: nodeColor }
+              ]} />
+              
+              <Text style={[
+                styles.text, 
+                {
+                  fontSize: levelStyle.fontSize,
+                  fontWeight: levelStyle.fontWeight,
+                  color: levelStyle.color,
+                }
+              ]}>
+                {node.text}
+              </Text>
+            </View>
+
+            {/* ZONE DE DÉTAILS (Visible seulement si expanded) */}
+            {isExpanded && (
+              <View style={styles.detailsContainer}>
+                <View style={[styles.separator, { backgroundColor: nodeColor + '20' }]} />
+                <Text style={styles.detailsText}>
+                  {description}
+                </Text>
+              </View>
+            )}
+        </TouchableOpacity>
       </View>
 
-      {/* 2. LES ENFANTS */}
+      {/* Enfants (Récursivité) */}
       {hasChildren && (
         <View style={styles.childrenContainer}>
           <View style={[styles.verticalLine, { backgroundColor: nodeColor + '20' }]} />
@@ -88,20 +178,15 @@ const MindMapCanvas: React.FC<MindMapCanvasProps> = ({ rootNode }) => {
   return (
     <ScrollView 
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={styles.verticalScrollContent}
       showsVerticalScrollIndicator={false}
-      showsHorizontalScrollIndicator={false} 
     >
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1 }} // Permet au contenu de remplir l'écran
+        contentContainerStyle={styles.horizontalScrollContent}
       >
-         {/* CORRECTION : On soustrait le padding de la largeur minimale forcée */}
-         <View style={[
-           styles.horizontalScrollWrapper, 
-           { minWidth: SCREEN_WIDTH - (HORIZONTAL_PADDING * 2) }
-         ]}>
+         <View style={styles.treeContainer}>
             <MindMapItem node={rootNode} level={0} />
          </View>
       </ScrollView>
@@ -114,52 +199,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
-  scrollContent: {
+  verticalScrollContent: {
     paddingVertical: 20,
     paddingBottom: 100,
   },
-  horizontalScrollWrapper: {
-    paddingHorizontal: HORIZONTAL_PADDING, // 20px de chaque côté
-    // Le minWidth est géré inline pour le calcul dynamique
+  horizontalScrollContent: {
+    paddingHorizontal: 20,
   },
-  itemWrapper: {
-    width: '100%',
-  },
+  treeContainer: {},
+  itemWrapper: {},
   
   // --- LAYOUT ---
   nodeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    width: '100%',
-    // On enlève le paddingRight ici car il est géré par le wrapper principal maintenant
+    alignItems: 'center', // Important : Alignement en haut si la carte grandit
+    marginBottom: 12,
   },
   childrenContainer: {
     flexDirection: 'row',
-    width: '100%',
   },
   childrenContent: {
-    flex: 1,
     flexDirection: 'column',
   },
 
   // --- CONNECTEURS ---
   connectorContainer: {
     width: 24,
-    height: 30, 
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    // On veut que le connecteur reste aligné avec le haut de la carte
+    height: '100%', 
+    paddingTop: 24, // Ajustement pour aligner avec le milieu du HEADER de la carte (pas toute la carte)
+    position: 'absolute', // Astuce pour éviter de déformer le layout quand la carte s'ouvre
+    left: -24,
   },
   connectorElbow: {
-    position: 'absolute',
-    left: 0,
-    top: -24, 
-    bottom: '50%',
     width: 16,
+    height: 30, // Taille fixe du coude
     borderBottomWidth: 2,
     borderLeftWidth: 2,
     borderBottomLeftRadius: 12,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+    marginTop: -15, // Pour remonter le coude
   },
   verticalLine: {
     width: 2,
@@ -169,51 +248,53 @@ const styles = StyleSheet.create({
 
   // --- CARDS ---
   cardBase: {
-    flex: 1, // Stretch
+    flexDirection: 'column', // Changé en colonne pour accueillir les détails en dessous
+    alignItems: 'flex-start',
+    borderRadius: 12,
+    overflow: 'hidden', // Pour contenir l'animation
+  },
+  
+  // Header de la carte (Titre + Indicateur)
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    minWidth: 150,
+    width: '100%',
   },
-  cardRoot: {
-    backgroundColor: 'rgba(255, 107, 0, 0.1)',
-    marginBottom: 24,
-    paddingVertical: 20,
-  },
-  cardChild: {},
 
   // --- INDICATEURS ---
   indicator: {
     width: 4,
-    height: '100%',
-    minHeight: 16,
+    height: 16, // Hauteur fixe pour l'indicateur
     borderRadius: 2,
-    marginRight: 14,
+    marginRight: 12,
   },
-  indicatorRoot: {
-    width: 6,
-    height: 20,
+  
+  // Style chevron supprimé
+
+  // --- DÉTAILS ---
+  detailsContainer: {
+    marginTop: 12,
+    width: '100%',
+    paddingLeft: 16, // Alignement sous le texte
+  },
+  separator: {
+    height: 1,
+    width: '100%',
+    marginBottom: 8,
+    opacity: 0.3,
+  },
+  detailsText: {
+    fontSize: 14,
+    color: '#A1A1AA', // Gris lisible
+    lineHeight: 20,
+    fontWeight: '400',
   },
 
   // --- TEXTE ---
   text: {
     flex: 1, 
     flexWrap: 'wrap',
-  },
-  textRoot: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFF',
-    letterSpacing: 0.5,
-  },
-  textChild: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#E4E4E7',
-    lineHeight: 22,
+    letterSpacing: 0.3,
   },
 });
 

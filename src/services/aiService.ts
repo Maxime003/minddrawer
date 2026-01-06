@@ -18,6 +18,7 @@ export async function generateMindMap(
 ): Promise<MindMapNode> {
   try {
 
+    // MODIFICATION ICI : Ajout de la demande de description dans le prompt
     const prompt = `Tu es un expert pédagogique en création de Mind Maps pour l'apprentissage.
 
 Analyse le texte suivant et crée une Mind Map structurée en JSON.
@@ -31,27 +32,33 @@ INSTRUCTIONS STRICTES:
 1. Crée une Mind Map hiérarchique avec le titre "${title}" comme nœud central (id: "root", text: "${title}")
 2. Identifie 3 à 5 concepts principaux comme enfants du nœud central
 3. Pour chaque concept principal, ajoute 1 à 3 sous-concepts si pertinent
-4. Chaque nœud doit avoir un "text" court et clair (max 50 caractères)
+4. Chaque nœud doit avoir :
+   - un "text" court et clair (max 50 caractères)
+   - une "description" pédagogique courte et percutante (1 ou 2 phrases max) pour expliquer le concept.
 5. La structure doit être logique et pédagogique
 
 FORMAT JSON REQUIS:
 {
   "id": "root",
   "text": "${title}",
+  "description": "Vue d'ensemble du sujet...",
   "children": [
     {
       "id": "1",
       "text": "Concept 1",
+      "description": "Explication clé du concept 1...",
       "children": [
         {
           "id": "1-1",
-          "text": "Sous-concept 1.1"
+          "text": "Sous-concept 1.1",
+          "description": "Détail spécifique sur le sous-concept..."
         }
       ]
     },
     {
       "id": "2",
-      "text": "Concept 2"
+      "text": "Concept 2",
+      "description": "Explication du concept 2..."
     }
   ]
 }
@@ -133,6 +140,7 @@ RÈGLE ABSOLUE: Réponds UNIQUEMENT avec le JSON brut.
       return {
         id: nodeId,
         text: node.text,
+        description: node.description, // MODIFICATION ICI : On préserve la description
         children: node.children?.map((child, i) => addIds(child, nodeId, i)),
       };
     };
