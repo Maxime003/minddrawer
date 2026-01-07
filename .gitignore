@@ -39,3 +39,11 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Sécurité : Ignorer TOUS les fichiers d'environnement
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env
